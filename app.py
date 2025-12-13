@@ -123,14 +123,30 @@ elif menu == "Live Journal Analysis":
     text = st.text_area("Enter journal entry:", height=180)
 
     if st.button("Analyze Entry"):
-        clean = clean_text(text)
-        vec = vectorizer.transform([clean])
-        pred = svm_model.predict(vec)
-        sentiment = label_encoder.inverse_transform(pred)[0]
+       clean = clean_text(text)
+vec = vectorizer.transform([clean])
 
-        score = sentiment_score(sentiment)
-        emotions = detect_emotions(clean)
-        primary_emotion = max(emotions, key=emotions.get)
+# ---------------- SENTIMENT PREDICTION ----------------
+pred = svm_model.predict(vec)
+sentiment = label_encoder.inverse_transform(pred)[0]
+
+# Confidence-based neutral handling
+decision = svm_model.decision_function(vec)
+if abs(decision[0]) < 0.25:
+    sentiment = "Neutral"
+
+# ---------------- EMOTION DETECTION ----------------
+emotions = detect_emotions(clean)
+
+# Handle no emotion case
+if sum(emotions.values()) == 0:
+    primary_emotion = "Neutral"
+else:
+    primary_emotion = max(emotions, key=emotions.get)
+
+# ---------------- SENTIMENT SCORE ----------------
+score = sentiment_score(sentiment)
+
 
         st.session_state.history.append({
             "time": datetime.now(),
@@ -292,3 +308,4 @@ st.markdown(
     "<center>🧠 Emotion Analytics Dashboard – Academic Project</center>",
     unsafe_allow_html=True
 )
+
