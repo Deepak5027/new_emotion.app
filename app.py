@@ -256,15 +256,46 @@ elif menu == "Word & Text Analysis":
 
 # ==========================================================
 # MODEL EVALUATION
-# ==========================================================
-elif menu == "Model Evaluation":
-    st.title("📉 Model Evaluation")
+# =========================================================
+   elif menu == "Model Evaluation":
+    st.title("📉 Model Evaluation Metrics")
 
-    y_true = ["Positive", "Negative", "Neutral", "Positive", "Neutral"]
-    y_pred = ["Positive", "Neutral", "Neutral", "Positive","Negative"]
+    # --------------------------------------------------
+    # Sample Test Data (For Demonstration)
+    # --------------------------------------------------
+    y_true = [
+        "Positive", "Negative", "Neutral", "Positive",
+        "Neutral", "Negative", "Positive", "Neutral"
+    ]
+
+    y_pred = [
+        "Positive", "Neutral", "Neutral", "Positive",
+        "Neutral", "Negative", "Positive", "Negative"
+    ]
 
     labels = ["Negative", "Neutral", "Positive"]
 
+    # --------------------------------------------------
+    # METRICS
+    # --------------------------------------------------
+    accuracy = accuracy_score(y_true, y_pred)
+    precision = precision_score(y_true, y_pred, average="weighted", zero_division=0)
+    recall = recall_score(y_true, y_pred, average="weighted", zero_division=0)
+    f1 = f1_score(y_true, y_pred, average="weighted", zero_division=0)
+
+    # --------------------------------------------------
+    # DISPLAY METRICS
+    # --------------------------------------------------
+    col1, col2, col3, col4 = st.columns(4)
+
+    col1.metric("Accuracy", f"{accuracy*100:.2f}%")
+    col2.metric("Precision", f"{precision:.2f}")
+    col3.metric("Recall", f"{recall:.2f}")
+    col4.metric("F1 Score", f"{f1:.2f}")
+
+    # --------------------------------------------------
+    # CONFUSION MATRIX
+    # --------------------------------------------------
     cm = confusion_matrix(y_true, y_pred, labels=labels)
 
     fig, ax = plt.subplots()
@@ -277,15 +308,21 @@ elif menu == "Model Evaluation":
         yticklabels=labels,
         ax=ax
     )
+
     ax.set_xlabel("Predicted Label")
     ax.set_ylabel("True Label")
-    ax.set_title("Confusion Matrix (Sample Evaluation)")
+    ax.set_title("Confusion Matrix")
     st.pyplot(fig)
-    
+
+    # --------------------------------------------------
+    # EXPLANATION
+    # --------------------------------------------------
     st.info(
-        "Note: This confusion matrix is shown for demonstration purposes, "
-        "as live user input does not have ground-truth labels."
+        "The above evaluation metrics are calculated using labeled test data. "
+        "Live journal entries do not have ground truth labels, so real-time accuracy "
+        "cannot be computed."
     )
+
 
 # ==========================================================
 # INSIGHTS
@@ -329,4 +366,5 @@ st.markdown(
     "<center>🧠 Emotion Analytics Dashboard | Final Year Project</center>",
     unsafe_allow_html=True
 )
+
 
