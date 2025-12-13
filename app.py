@@ -1,6 +1,6 @@
 # ==========================================================
 # EMOTION ANALYTICS FROM JOURNAL APPS
-# FINAL STREAMLIT DASHBOARD
+# COMPLETE FINAL STREAMLIT DASHBOARD
 # ==========================================================
 
 import streamlit as st
@@ -13,6 +13,8 @@ import seaborn as sns
 import plotly.graph_objects as go
 from datetime import datetime
 from sklearn.metrics import confusion_matrix
+from wordcloud import WordCloud
+from collections import Counter
 
 # ----------------------------------------------------------
 # PAGE CONFIG
@@ -36,7 +38,7 @@ def load_assets():
 svm_model, vectorizer, label_encoder = load_assets()
 
 # ----------------------------------------------------------
-# TEXT PREPROCESSING
+# TEXT CLEANING
 # ----------------------------------------------------------
 def clean_text(text):
     text = text.lower()
@@ -44,7 +46,7 @@ def clean_text(text):
     return text
 
 # ----------------------------------------------------------
-# EMOTION LEXICON (RULE-BASED)
+# EMOTION KEYWORDS
 # ----------------------------------------------------------
 emotion_keywords = {
     "Joy": ["happy", "joy", "excited", "grateful", "pleased"],
@@ -63,7 +65,7 @@ def detect_emotions(text):
     return scores
 
 # ----------------------------------------------------------
-# SENTIMENT SCORE
+# SENTIMENT SCORE NORMALIZATION
 # ----------------------------------------------------------
 def sentiment_score(sentiment):
     if sentiment.lower() == "positive":
@@ -74,13 +76,13 @@ def sentiment_score(sentiment):
         return 0.2
 
 # ----------------------------------------------------------
-# SESSION HISTORY
+# SESSION STORAGE
 # ----------------------------------------------------------
 if "history" not in st.session_state:
     st.session_state.history = []
 
 # ----------------------------------------------------------
-# SIDEBAR NAVIGATION
+# SIDEBAR
 # ----------------------------------------------------------
 st.sidebar.title("📊 Dashboard Menu")
 menu = st.sidebar.radio(
@@ -90,6 +92,7 @@ menu = st.sidebar.radio(
         "Live Journal Analysis",
         "Emotion Analytics",
         "Trend & Timeline",
+        "Word & Text Analysis",
         "Model Evaluation",
         "Insights",
         "History",
@@ -105,45 +108,47 @@ if menu == "Overview":
 
     col1, col2, col3, col4 = st.columns(4)
     col1.metric("Model", "Linear SVM")
-    col2.metric("Feature Extraction", "TF-IDF")
-    col3.metric("Analysis Type", "Sentiment + Emotion")
+    col2.metric("Features", "TF-IDF")
+    col3.metric("Analysis", "Sentiment + Emotion")
     col4.metric("Platform", "Streamlit")
 
     st.markdown("""
-    This dashboard implements **Emotion Analytics from Journal Apps**
-    to support **early mental health detection** using NLP and machine learning.
+    This system analyzes mental health journal entries using
+    Natural Language Processing and Machine Learning to
+    identify emotional patterns and sentiment trends.
     """)
 
 # ==========================================================
-# LIVE JOURNAL ANALYSIS (FIXED & FINAL)
+# LIVE JOURNAL ANALYSIS
 # ==========================================================
 elif menu == "Live Journal Analysis":
     st.title("✍️ Live Journal Entry Analysis")
 
-    text = st.text_area("Enter journal entry:", height=180)
+    text = st.text_area("Enter your journal entry:", height=180)
 
     if st.button("Analyze Entry") and text.strip() != "":
-        # Preprocess
         clean = clean_text(text)
         vec = vectorizer.transform([clean])
 
-        # Sentiment prediction
+        # Sentiment Prediction
         pred = svm_model.predict(vec)
         sentiment = label_encoder.inverse_transform(pred)[0]
 
-        # Confidence-based neutral handling
-        decision = svm_model.decision_function(vec)
-        if abs(decision[0]) < 0.25:
+        # Multi-class confidence handling
+        decision_scores = svm_model.decision_function(vec)[0]
+        sorted_scores = np.sort(decision_scores)
+        confidence_gap = sorted_scores[-1] - sorted_scores[-2]
+
+        if confidence_gap < 0.3:
             sentiment = "Neutral"
 
-        # Emotion detection
+        # Emotion Detection
         emotions = detect_emotions(clean)
-        if sum(emotions.values()) == 0:
-            primary_emotion = "Neutral"
-        else:
-            primary_emotion = max(emotions, key=emotions.get)
+        primary_emotion = (
+            max(emotions, key=emotions.get)
+            if sum(emotions.values()) > 0 else "Neutral"
+        )
 
-        # Sentiment score
         score = sentiment_score(sentiment)
 
         # Save history
@@ -155,51 +160,41 @@ elif menu == "Live Journal Analysis":
             "score": score
         })
 
-        # Display result
         st.success(f"Sentiment: **{sentiment}**")
         st.info(f"Primary Emotion: **{primary_emotion}**")
 
-        # Sentiment gauge
+        # Sentiment Gauge
         fig = go.Figure(go.Indicator(
             mode="gauge+number",
             value=score,
             title={"text": "Sentiment Score"},
-            gauge={
-                "axis": {"range": [0, 1]},
-                "steps": [
-                    {"range": [0, 0.4], "color": "red"},
-                    {"range": [0.4, 0.6], "color": "yellow"},
-                    {"range": [0.6, 1], "color": "green"}
-                ]
-            }
+            gauge={"axis": {"range": [0, 1]}}
         ))
         st.plotly_chart(fig, use_container_width=True)
 
-        # Emotion bar chart
-        fig2, ax = plt.subplots()
-        ax.bar(emotions.keys(), emotions.values())
-        ax.set_title("Emotion Intensity")
-        ax.set_ylabel("Score")
+        # Emotion Bar Chart
+        fig2, ax2 = plt.subplots()
+        ax2.bar(emotions.keys(), emotions.values())
+        ax2.set_title("Emotion Intensity")
+        ax2.set_ylabel("Count")
         st.pyplot(fig2)
 
 # ==========================================================
 # EMOTION ANALYTICS
 # ==========================================================
 elif menu == "Emotion Analytics":
-    st.title("📊 Emotion Analytics & Heatmap")
+    st.title("📊 Emotion Analytics")
 
     if len(st.session_state.history) == 0:
-        st.warning("No data available yet.")
+        st.warning("No data available.")
     else:
         df = pd.DataFrame(st.session_state.history)
 
-        # Emotion distribution
         fig, ax = plt.subplots()
         df["emotion"].value_counts().plot(kind="bar", ax=ax)
-        ax.set_title("Emotion Frequency Distribution")
+        ax.set_title("Emotion Distribution")
         st.pyplot(fig)
 
-        # Heatmap
         pivot = pd.crosstab(df["emotion"], df["sentiment"])
         fig2, ax2 = plt.subplots()
         sns.heatmap(pivot, annot=True, cmap="coolwarm", ax=ax2)
@@ -213,22 +208,58 @@ elif menu == "Trend & Timeline":
     st.title("📈 Sentiment Trend Over Time")
 
     if len(st.session_state.history) == 0:
-        st.info("Add journal entries to view trends.")
+        st.info("No data yet.")
     else:
         df = pd.DataFrame(st.session_state.history)
         fig, ax = plt.subplots()
         ax.plot(df["time"], df["score"], marker="o")
+        ax.set_ylim(0, 1)
         ax.set_ylabel("Sentiment Score")
-        ax.set_title("Sentiment Timeline")
+        ax.set_xlabel("Time")
+        ax.set_title("Sentiment Trend (0–1 Scale)")
         st.pyplot(fig)
+
+# ==========================================================
+# WORD & TEXT ANALYSIS
+# ==========================================================
+elif menu == "Word & Text Analysis":
+    st.title("📝 Word & Text Analysis")
+
+    if len(st.session_state.history) == 0:
+        st.warning("No journal entries available.")
+    else:
+        df = pd.DataFrame(st.session_state.history)
+        all_text = " ".join(df["text"].apply(clean_text))
+
+        # Word Cloud
+        wordcloud = WordCloud(
+            width=900,
+            height=400,
+            background_color="white"
+        ).generate(all_text)
+
+        fig, ax = plt.subplots(figsize=(10, 5))
+        ax.imshow(wordcloud, interpolation="bilinear")
+        ax.axis("off")
+        st.pyplot(fig)
+
+        # Top Words
+        words = all_text.split()
+        common_words = Counter(words).most_common(15)
+        word_df = pd.DataFrame(common_words, columns=["Word", "Frequency"])
+
+        fig2, ax2 = plt.subplots()
+        ax2.barh(word_df["Word"], word_df["Frequency"])
+        ax2.invert_yaxis()
+        ax2.set_title("Top Emotional Words")
+        st.pyplot(fig2)
 
 # ==========================================================
 # MODEL EVALUATION
 # ==========================================================
 elif menu == "Model Evaluation":
-    st.title("📉 Model Evaluation & Confusion Matrix")
+    st.title("📉 Model Evaluation")
 
-    # Example visualization (replace with real test data if available)
     y_true = ["Positive", "Negative", "Neutral", "Positive"]
     y_pred = ["Positive", "Neutral", "Neutral", "Positive"]
 
@@ -256,23 +287,21 @@ elif menu == "Insights":
     st.title("🧠 Intelligent Insights")
 
     if len(st.session_state.history) == 0:
-        st.info("No insights available.")
+        st.info("No insights yet.")
     else:
-        df = pd.DataFrame(st.session_state.history)
-        avg_score = df["score"].mean()
-
-        if avg_score < 0.4:
-            st.error("⚠️ Sustained negative emotional trend detected.")
-        elif avg_score < 0.6:
-            st.warning("⚠️ Emotional state appears unstable.")
+        avg = pd.DataFrame(st.session_state.history)["score"].mean()
+        if avg < 0.4:
+            st.error("⚠️ Strong negative emotional trend detected.")
+        elif avg < 0.6:
+            st.warning("⚠️ Emotional state is unstable.")
         else:
-            st.success("✅ Emotional patterns appear stable and positive.")
+            st.success("✅ Overall emotional state is positive.")
 
 # ==========================================================
 # HISTORY
 # ==========================================================
 elif menu == "History":
-    st.title("📜 Journal Analysis History")
+    st.title("📜 Analysis History")
     if len(st.session_state.history) == 0:
         st.info("No history yet.")
     else:
@@ -282,21 +311,14 @@ elif menu == "History":
 # ABOUT
 # ==========================================================
 elif menu == "About":
-    st.title("ℹ️ About This Project")
+    st.title("ℹ️ About")
     st.markdown("""
-    **Project Title:** Emotion Analytics from Journal Apps for Early Mental Health Detection  
-    **Model:** Linear SVM  
-    **Tech Stack:** NLP, Machine Learning, Streamlit  
-
-    ⚠️ This system is for academic and research purposes only.
+    **Emotion Analytics from Journal Apps for Early Mental Health Detection**  
+    Final Year Academic Project using NLP & Machine Learning.
     """)
 
-# ----------------------------------------------------------
-# FOOTER
-# ----------------------------------------------------------
 st.markdown("---")
 st.markdown(
     "<center>🧠 Emotion Analytics Dashboard | Final Year Project</center>",
     unsafe_allow_html=True
 )
-
