@@ -336,16 +336,17 @@ elif menu == "Model Evaluation":
 elif menu == "Insights":
     st.title("🧠 Intelligent Insights")
 
-    if len(st.session_state.history) == 0:
-        st.info("No insights yet.")
+    if len(st.session_state.history) < 3:
+        st.info("Not enough data to determine emotional stability.")
     else:
         avg = pd.DataFrame(st.session_state.history)["score"].mean()
-        if avg < 0.4:
+        if avg < 0.35:
             st.error("⚠️ Strong negative emotional trend detected.")
-        elif avg < 0.6:
+        elif avg < 0.65:
             st.warning("⚠️ Emotional state is unstable.")
         else:
             st.success("✅ Overall emotional state is positive.")
+
 
 # ==========================================================
 # HISTORY
@@ -372,6 +373,7 @@ st.markdown(
     "<center>🧠 Emotion Analytics Dashboard | Final Year Project</center>",
     unsafe_allow_html=True
 )
+
 
 
 
