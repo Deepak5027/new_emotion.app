@@ -260,10 +260,12 @@ elif menu == "Word & Text Analysis":
 elif menu == "Model Evaluation":
     st.title("📉 Model Evaluation")
 
-    y_true = ["Positive", "Negative", "Neutral", "Positive"]
-    y_pred = ["Positive", "Neutral", "Neutral", "Positive"]
+    y_true = ["Positive", "Negative", "Neutral", "Positive", "Neutral"]
+    y_pred = ["Positive", "Neutral", "Neutral", "Positive","Negative"]
 
-    cm = confusion_matrix(y_true, y_pred, labels=label_encoder.classes_)
+    labels = ["Negative", "Neutral", "Positive"]
+
+    cm = confusion_matrix(y_true, y_pred, labels=labels)
 
     fig, ax = plt.subplots()
     sns.heatmap(
@@ -271,14 +273,19 @@ elif menu == "Model Evaluation":
         annot=True,
         fmt="d",
         cmap="Blues",
-        xticklabels=label_encoder.classes_,
-        yticklabels=label_encoder.classes_,
+        xticklabels=labels,
+        yticklabels=labels,
         ax=ax
     )
-    ax.set_xlabel("Predicted")
-    ax.set_ylabel("Actual")
-    ax.set_title("Confusion Matrix")
+    ax.set_xlabel("Predicted Label")
+    ax.set_ylabel("True Label")
+    ax.set_title("Confusion Matrix (Sample Evaluation)")
     st.pyplot(fig)
+    
+    st.info(
+        "Note: This confusion matrix is shown for demonstration purposes, "
+        "as live user input does not have ground-truth labels."
+    )
 
 # ==========================================================
 # INSIGHTS
@@ -322,3 +329,4 @@ st.markdown(
     "<center>🧠 Emotion Analytics Dashboard | Final Year Project</center>",
     unsafe_allow_html=True
 )
+
