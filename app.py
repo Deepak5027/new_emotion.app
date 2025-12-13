@@ -47,7 +47,7 @@ def clean_text(text):
 # EMOTION LEXICON (RULE-BASED)
 # ----------------------------------------------------------
 emotion_keywords = {
-    "Joy": ["happy", "joy", excited", "grateful", "pleased"],
+    "Joy": ["happy", "joy", "excited", "grateful", "pleased"],
     "Sadness": ["sad", "lonely", "hopeless", "cry", "down"],
     "Anger": ["angry", "frustrated", "irritated", "mad"],
     "Fear": ["anxious", "worried", "panic", "scared", "stress"],
@@ -299,3 +299,4 @@ st.markdown(
     "<center>🧠 Emotion Analytics Dashboard | Final Year Project</center>",
     unsafe_allow_html=True
 )
+
