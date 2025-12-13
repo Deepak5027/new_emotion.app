@@ -12,7 +12,13 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import plotly.graph_objects as go
 from datetime import datetime
-from sklearn.metrics import confusion_matrix
+from sklearn.metrics import (
+    confusion_matrix,
+    accuracy_score,
+    precision_score,
+    recall_score,
+    f1_score
+)
 from wordcloud import WordCloud
 from collections import Counter
 
@@ -366,6 +372,7 @@ st.markdown(
     "<center>🧠 Emotion Analytics Dashboard | Final Year Project</center>",
     unsafe_allow_html=True
 )
+
 
 
 
