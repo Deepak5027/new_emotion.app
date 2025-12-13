@@ -1,6 +1,6 @@
-# ======================================================
-# Mental Health Sentiment Analysis Dashboard
-# ======================================================
+# ==========================================================
+# ADVANCED MENTAL HEALTH ANALYTICS DASHBOARD
+# ==========================================================
 
 import streamlit as st
 import pandas as pd
@@ -8,153 +8,242 @@ import numpy as np
 import joblib
 import re
 import matplotlib.pyplot as plt
-import seaborn as sns
-from sklearn.metrics import recall_score
+import plotly.graph_objects as go
+from datetime import datetime
 
-# ------------------------------------------------------
+# ----------------------------------------------------------
 # PAGE CONFIG
-# ------------------------------------------------------
+# ----------------------------------------------------------
 st.set_page_config(
-    page_title="Mental Health Sentiment Dashboard",
+    page_title="Mental Health Analytics Dashboard",
     page_icon="🧠",
     layout="wide"
 )
 
-# ------------------------------------------------------
-# LOAD MODEL & FILES
-# ------------------------------------------------------
+# ----------------------------------------------------------
+# LOAD MODELS
+# ----------------------------------------------------------
 @st.cache_resource
-def load_models():
+def load_assets():
     svm_model = joblib.load("svm_sentiment_model.joblib")
     vectorizer = joblib.load("tfidf_vectorizer.joblib")
     label_encoder = joblib.load("label_encoder.joblib")
     return svm_model, vectorizer, label_encoder
 
-svm_model, vectorizer, label_encoder = load_models()
+svm_model, vectorizer, label_encoder = load_assets()
 
-# ------------------------------------------------------
-# TEXT CLEANING FUNCTION
-# ------------------------------------------------------
+# ----------------------------------------------------------
+# TEXT CLEANING
+# ----------------------------------------------------------
 def clean_text(text):
     text = text.lower()
     text = re.sub(r"[^a-z\s]", "", text)
     return text
 
-# ------------------------------------------------------
-# SIDEBAR
-# ------------------------------------------------------
-st.sidebar.title("📊 Dashboard Controls")
-menu = st.sidebar.radio(
-    "Navigate",
-    ["Overview", "Live Prediction", "Model Performance", "Insights", "About"]
+# ----------------------------------------------------------
+# EMOTION DETECTION (RULE-BASED – EXAM SAFE)
+# ----------------------------------------------------------
+emotion_keywords = {
+    "Joy": ["happy", "joy", "excited", "grateful", "positive"],
+    "Sadness": ["sad", "down", "hopeless", "cry", "lonely"],
+    "Anger": ["angry", "frustrated", "irritated", "mad"],
+    "Fear": ["anxious", "scared", "fear", "worried", "panic"],
+    "Calm": ["calm", "peace", "relaxed", "content"]
+}
+
+def detect_emotions(text):
+    scores = {emo: 0 for emo in emotion_keywords}
+    for emo, words in emotion_keywords.items():
+        for w in words:
+            if w in text:
+                scores[emo] += 1
+    return scores
+
+# ----------------------------------------------------------
+# SENTIMENT SCORE (CONTINUOUS)
+# ----------------------------------------------------------
+def sentiment_score(sentiment):
+    if sentiment.lower() == "positive":
+        return 0.8
+    elif sentiment.lower() == "neutral":
+        return 0.5
+    else:
+        return 0.2
+
+# ----------------------------------------------------------
+# SESSION HISTORY
+# ----------------------------------------------------------
+if "history" not in st.session_state:
+    st.session_state.history = []
+
+# ----------------------------------------------------------
+# SIDEBAR NAVIGATION
+# ----------------------------------------------------------
+st.sidebar.title("📊 Navigation")
+page = st.sidebar.radio(
+    "Go to",
+    ["Overview", "Live Analysis", "Emotion Analytics", "History", "Insights", "About"]
 )
 
-# ------------------------------------------------------
-# OVERVIEW PAGE
-# ------------------------------------------------------
-if menu == "Overview":
-    st.title("🧠 Mental Health Sentiment Analysis")
-    st.markdown("""
-    This intelligent dashboard analyzes mental health journal entries using  
-    **Natural Language Processing and Machine Learning (Linear SVM)**.
+# ==========================================================
+# OVERVIEW
+# ==========================================================
+if page == "Overview":
+    st.title("🧠 Mental Health Emotion & Sentiment Analytics")
 
-    **Purpose:** Early detection of emotional patterns from written journals.
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("Model", "Linear SVM")
+    col2.metric("NLP", "TF-IDF")
+    col3.metric("Task", "Sentiment + Emotion")
+    col4.metric("Deployment", "Streamlit")
+
+    st.markdown("""
+    This intelligent dashboard analyzes **mental health journal entries**
+    to extract **sentiment, emotions, behavioral patterns, and insights**.
     """)
 
-    col1, col2, col3 = st.columns(3)
-    col1.metric("Model Used", "Linear SVM")
-    col2.metric("Feature Method", "TF-IDF")
-    col3.metric("Task", "Sentiment Classification")
+# ==========================================================
+# LIVE ANALYSIS
+# ==========================================================
+elif page == "Live Analysis":
+    st.title("✍️ Live Journal Analysis")
 
-# ------------------------------------------------------
-# LIVE PREDICTION
-# ------------------------------------------------------
-elif menu == "Live Prediction":
-    st.title("✍️ Live Sentiment Prediction")
+    text = st.text_area("Enter your journal entry:", height=180)
 
-    user_text = st.text_area(
-        "Enter a mental health journal entry:",
-        height=180
-    )
-
-    if st.button("Predict Sentiment"):
-        cleaned = clean_text(user_text)
-        vectorized = vectorizer.transform([cleaned])
-        prediction = svm_model.predict(vectorized)
-        sentiment = label_encoder.inverse_transform(prediction)[0]
-
-        st.success(f"🧠 Predicted Sentiment: **{sentiment.upper()}**")
-
-# ------------------------------------------------------
-# MODEL PERFORMANCE
-# ------------------------------------------------------
-elif menu == "Model Performance":
-    st.title("📈 Model Performance Evaluation")
-
-    # Dummy accuracy (replace with your actual value if needed)
-    final_accuracy = 0.50
-
-    st.metric("Final Model Accuracy", f"{final_accuracy*100:.2f}%")
-
-    # Accuracy Bar
-    fig, ax = plt.subplots()
-    ax.bar(["Linear SVM"], [final_accuracy])
-    ax.set_ylim(0, 1)
-    ax.set_ylabel("Accuracy")
-    ax.set_title("Final Model Accuracy")
-    st.pyplot(fig)
-
-# ------------------------------------------------------
-# INSIGHTS PAGE
-# ------------------------------------------------------
-elif menu == "Insights":
-    st.title("🔍 Prediction Behavior & Insights")
-
-    sample_texts = [
-        "I feel very anxious and stressed today",
-        "I am feeling calm and hopeful",
-        "Everything feels overwhelming"
-    ]
-
-    predictions = []
-    for text in sample_texts:
+    if st.button("Analyze"):
         clean = clean_text(text)
         vec = vectorizer.transform([clean])
         pred = svm_model.predict(vec)
-        predictions.append(label_encoder.inverse_transform(pred)[0])
+        sentiment = label_encoder.inverse_transform(pred)[0]
 
-    insight_df = pd.DataFrame({
-        "Journal Text": sample_texts,
-        "Predicted Sentiment": predictions
-    })
+        score = sentiment_score(sentiment)
+        emotions = detect_emotions(clean)
+        primary_emotion = max(emotions, key=emotions.get)
 
-    st.dataframe(insight_df, use_container_width=True)
+        # Save history
+        st.session_state.history.append({
+            "time": datetime.now(),
+            "text": text,
+            "sentiment": sentiment,
+            "emotion": primary_emotion,
+            "score": score
+        })
 
-# ------------------------------------------------------
-# ABOUT PAGE
-# ------------------------------------------------------
-elif menu == "About":
-    st.title("ℹ️ About This Project")
+        # ---------------------------
+        # SENTIMENT RESULT
+        # ---------------------------
+        st.success(f"Sentiment: **{sentiment.upper()}**")
+        st.info(f"Primary Emotion: **{primary_emotion}**")
+
+        # ---------------------------
+        # SENTIMENT SCORE GAUGE
+        # ---------------------------
+        fig = go.Figure(go.Indicator(
+            mode="gauge+number",
+            value=score,
+            title={"text": "Sentiment Score"},
+            gauge={
+                "axis": {"range": [0, 1]},
+                "bar": {"color": "darkblue"},
+                "steps": [
+                    {"range": [0, 0.4], "color": "red"},
+                    {"range": [0.4, 0.6], "color": "yellow"},
+                    {"range": [0.6, 1], "color": "green"}
+                ]
+            }
+        ))
+        st.plotly_chart(fig, use_container_width=True)
+
+        # ---------------------------
+        # EMOTION BAR CHART
+        # ---------------------------
+        fig2, ax = plt.subplots()
+        ax.bar(emotions.keys(), emotions.values())
+        ax.set_title("Emotion Intensity")
+        ax.set_ylabel("Score")
+        st.pyplot(fig2)
+
+# ==========================================================
+# EMOTION ANALYTICS
+# ==========================================================
+elif page == "Emotion Analytics":
+    st.title("📈 Emotion Analytics")
+
+    if len(st.session_state.history) == 0:
+        st.warning("No data available yet.")
+    else:
+        df_hist = pd.DataFrame(st.session_state.history)
+
+        # Emotion distribution
+        fig, ax = plt.subplots()
+        df_hist["emotion"].value_counts().plot(kind="bar", ax=ax)
+        ax.set_title("Emotion Distribution")
+        st.pyplot(fig)
+
+        # Sentiment over time
+        fig2, ax2 = plt.subplots()
+        ax2.plot(df_hist["time"], df_hist["score"], marker="o")
+        ax2.set_title("Sentiment Trend Over Time")
+        ax2.set_ylabel("Sentiment Score")
+        st.pyplot(fig2)
+
+# ==========================================================
+# HISTORY
+# ==========================================================
+elif page == "History":
+    st.title("📜 Analysis History")
+
+    if len(st.session_state.history) == 0:
+        st.info("No history yet.")
+    else:
+        df = pd.DataFrame(st.session_state.history)
+        st.dataframe(df[["time", "sentiment", "emotion", "score"]])
+
+# ==========================================================
+# GPT-STYLE INSIGHTS (RULE-BASED)
+# ==========================================================
+elif page == "Insights":
+    st.title("🧠 Intelligent Insights")
+
+    if len(st.session_state.history) == 0:
+        st.info("Add some entries to get insights.")
+    else:
+        df = pd.DataFrame(st.session_state.history)
+        avg_score = df["score"].mean()
+
+        if avg_score < 0.4:
+            st.error("⚠️ Overall emotional tone indicates prolonged negativity.")
+        elif avg_score < 0.6:
+            st.warning("⚠️ Emotional state appears mixed or unstable.")
+        else:
+            st.success("✅ Emotional patterns appear stable and positive.")
+
+        st.markdown("""
+        **Insight Explanation:**
+        - Based on sentiment score trends
+        - Emotion frequency distribution
+        - No personal data stored permanently
+        """)
+
+# ==========================================================
+# ABOUT
+# ==========================================================
+elif page == "About":
+    st.title("ℹ️ About")
 
     st.markdown("""
-    **Project Name:** Mental Health Journal Sentiment Analysis  
-    **Model:** Linear Support Vector Machine (SVM)  
-    **Tech Stack:** Python, NLP, Streamlit  
+    **Project:** Mental Health Emotion Analytics  
+    **Model:** Linear SVM + NLP  
+    **Purpose:** Early emotional pattern detection  
 
-    **Use Case:**  
-    - Detect emotional patterns  
-    - Support early mental health insights  
-
-    ⚠️ *This system is for educational purposes only.*
+    ⚠️ This system is for educational and research use only.
     """)
 
-# ------------------------------------------------------
+# ==========================================================
 # FOOTER
-# ------------------------------------------------------
+# ==========================================================
 st.markdown("---")
 st.markdown(
-    "<center>🧠 Mental Health Analytics | Final Year Project</center>",
+    "<center>🧠 Intelligent Mental Health Analytics Dashboard</center>",
     unsafe_allow_html=True
 )
-
-
