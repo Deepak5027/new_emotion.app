@@ -257,7 +257,7 @@ elif menu == "Word & Text Analysis":
 # ==========================================================
 # MODEL EVALUATION
 # =========================================================
-   elif menu == "Model Evaluation":
+elif menu == "Model Evaluation":
     st.title("📉 Model Evaluation Metrics")
 
     # --------------------------------------------------
@@ -366,5 +366,6 @@ st.markdown(
     "<center>🧠 Emotion Analytics Dashboard | Final Year Project</center>",
     unsafe_allow_html=True
 )
+
 
 
