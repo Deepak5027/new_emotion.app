@@ -145,8 +145,16 @@ elif menu == "Live Journal Analysis":
         sorted_scores = np.sort(decision_scores)
         confidence_gap = sorted_scores[-1] - sorted_scores[-2]
 
-        if confidence_gap < 0.3:
+        if confidence_gap < 0.15:
             sentiment = "Neutral"
+ # Boost positive sentiment if joy-related words are detected
+positive_keywords = ["happy", "excited", "grateful", "relaxed", "proud"]
+if any(word in clean for word in positive_keywords) and sentiment != "Negative":
+    sentiment = "Positive"
+
+if primary_emotion == "Joy":
+    sentiment = "Positive"
+
 
         # Emotion Detection
         emotions = detect_emotions(clean)
@@ -373,6 +381,7 @@ st.markdown(
     "<center>🧠 Emotion Analytics Dashboard | Final Year Project</center>",
     unsafe_allow_html=True
 )
+
 
 
 
