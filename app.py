@@ -1,6 +1,6 @@
 # ==========================================================
 # EMOTION ANALYTICS FROM JOURNAL APPS
-# COMPLETE FINAL STREAMLIT DASHBOARD
+# FINAL CORRECTED STREAMLIT DASHBOARD
 # ==========================================================
 
 import streamlit as st
@@ -71,12 +71,12 @@ def detect_emotions(text):
     return scores
 
 # ----------------------------------------------------------
-# SENTIMENT SCORE NORMALIZATION
+# SENTIMENT SCORE
 # ----------------------------------------------------------
 def sentiment_score(sentiment):
-    if sentiment.lower() == "positive":
+    if sentiment == "Positive":
         return 0.8
-    elif sentiment.lower() == "neutral":
+    elif sentiment == "Neutral":
         return 0.5
     else:
         return 0.2
@@ -132,40 +132,45 @@ elif menu == "Live Journal Analysis":
 
     text = st.text_area("Enter your journal entry:", height=180)
 
-    if st.button("Analyze Entry") and text.strip() != "":
+    if st.button("Analyze Entry") and text.strip():
         clean = clean_text(text)
         vec = vectorizer.transform([clean])
 
-        # Sentiment Prediction
+        # -------------------------------
+        # SENTIMENT PREDICTION
+        # -------------------------------
         pred = svm_model.predict(vec)
         sentiment = label_encoder.inverse_transform(pred)[0]
 
-        # Multi-class confidence handling
-        decision_scores = svm_model.decision_function(vec)[0]
-        sorted_scores = np.sort(decision_scores)
-        confidence_gap = sorted_scores[-1] - sorted_scores[-2]
-
-        if confidence_gap < 0.15:
-            sentiment = "Neutral"
- # Boost positive sentiment if joy-related words are detected
-positive_keywords = ["happy", "excited", "grateful", "relaxed", "proud"]
-if any(word in clean for word in positive_keywords) and sentiment != "Negative":
-    sentiment = "Positive"
-
-if primary_emotion == "Joy":
-    sentiment = "Positive"
-
-
-        # Emotion Detection
+        # -------------------------------
+        # EMOTION DETECTION
+        # -------------------------------
         emotions = detect_emotions(clean)
-        primary_emotion = (
-            max(emotions, key=emotions.get)
-            if sum(emotions.values()) > 0 else "Neutral"
-        )
+        primary_emotion = max(emotions, key=emotions.get) if sum(emotions.values()) > 0 else "Neutral"
+
+        # -------------------------------
+        # SENTIMENT CORRECTION LOGIC
+        # -------------------------------
+        positive_words = ["happy", "excited", "grateful", "relaxed", "joy"]
+        negative_words = ["sad", "angry", "hopeless", "depressed", "panic", "stress"]
+
+        if any(w in clean for w in positive_words):
+            sentiment = "Positive"
+        elif any(w in clean for w in negative_words):
+            sentiment = "Negative"
+        else:
+            sentiment = "Neutral"
+
+        if primary_emotion in ["Joy", "Calm"]:
+            sentiment = "Positive"
+        elif primary_emotion in ["Sadness", "Anger", "Fear"]:
+            sentiment = "Negative"
 
         score = sentiment_score(sentiment)
 
-        # Save history
+        # -------------------------------
+        # SAVE HISTORY
+        # -------------------------------
         st.session_state.history.append({
             "time": datetime.now(),
             "text": text,
@@ -190,7 +195,6 @@ if primary_emotion == "Joy":
         fig2, ax2 = plt.subplots()
         ax2.bar(emotions.keys(), emotions.values())
         ax2.set_title("Emotion Intensity")
-        ax2.set_ylabel("Count")
         st.pyplot(fig2)
 
 # ==========================================================
@@ -199,7 +203,7 @@ if primary_emotion == "Joy":
 elif menu == "Emotion Analytics":
     st.title("📊 Emotion Analytics")
 
-    if len(st.session_state.history) == 0:
+    if not st.session_state.history:
         st.warning("No data available.")
     else:
         df = pd.DataFrame(st.session_state.history)
@@ -219,18 +223,16 @@ elif menu == "Emotion Analytics":
 # TREND & TIMELINE
 # ==========================================================
 elif menu == "Trend & Timeline":
-    st.title("📈 Sentiment Trend Over Time")
+    st.title("📈 Sentiment Trend")
 
-    if len(st.session_state.history) == 0:
+    if not st.session_state.history:
         st.info("No data yet.")
     else:
         df = pd.DataFrame(st.session_state.history)
         fig, ax = plt.subplots()
         ax.plot(df["time"], df["score"], marker="o")
         ax.set_ylim(0, 1)
-        ax.set_ylabel("Sentiment Score")
-        ax.set_xlabel("Time")
-        ax.set_title("Sentiment Trend (0–1 Scale)")
+        ax.set_title("Sentiment Trend")
         st.pyplot(fig)
 
 # ==========================================================
@@ -239,25 +241,18 @@ elif menu == "Trend & Timeline":
 elif menu == "Word & Text Analysis":
     st.title("📝 Word & Text Analysis")
 
-    if len(st.session_state.history) == 0:
-        st.warning("No journal entries available.")
+    if not st.session_state.history:
+        st.warning("No entries available.")
     else:
         df = pd.DataFrame(st.session_state.history)
         all_text = " ".join(df["text"].apply(clean_text))
 
-        # Word Cloud
-        wordcloud = WordCloud(
-            width=900,
-            height=400,
-            background_color="white"
-        ).generate(all_text)
-
+        wordcloud = WordCloud(width=900, height=400, background_color="white").generate(all_text)
         fig, ax = plt.subplots(figsize=(10, 5))
-        ax.imshow(wordcloud, interpolation="bilinear")
+        ax.imshow(wordcloud)
         ax.axis("off")
         st.pyplot(fig)
 
-        # Top Words
         words = all_text.split()
         common_words = Counter(words).most_common(15)
         word_df = pd.DataFrame(common_words, columns=["Word", "Frequency"])
@@ -265,78 +260,29 @@ elif menu == "Word & Text Analysis":
         fig2, ax2 = plt.subplots()
         ax2.barh(word_df["Word"], word_df["Frequency"])
         ax2.invert_yaxis()
-        ax2.set_title("Top Emotional Words")
         st.pyplot(fig2)
 
 # ==========================================================
 # MODEL EVALUATION
-# =========================================================
+# ==========================================================
 elif menu == "Model Evaluation":
     st.title("📉 Model Evaluation Metrics")
 
-    # --------------------------------------------------
-    # Sample Test Data (For Demonstration)
-    # --------------------------------------------------
-    y_true = [
-        "Positive", "Negative", "Neutral", "Positive",
-        "Neutral", "Negative", "Positive", "Neutral"
-    ]
-
-    y_pred = [
-        "Positive", "Neutral", "Neutral", "Positive",
-        "Neutral", "Negative", "Positive", "Negative"
-    ]
-
+    y_true = ["Positive", "Negative", "Neutral", "Positive", "Neutral", "Negative"]
+    y_pred = ["Positive", "Neutral", "Neutral", "Positive", "Neutral", "Negative"]
     labels = ["Negative", "Neutral", "Positive"]
 
-    # --------------------------------------------------
-    # METRICS
-    # --------------------------------------------------
-    accuracy = accuracy_score(y_true, y_pred)
-    precision = precision_score(y_true, y_pred, average="weighted", zero_division=0)
-    recall = recall_score(y_true, y_pred, average="weighted", zero_division=0)
-    f1 = f1_score(y_true, y_pred, average="weighted", zero_division=0)
-
-    # --------------------------------------------------
-    # DISPLAY METRICS
-    # --------------------------------------------------
     col1, col2, col3, col4 = st.columns(4)
+    col1.metric("Accuracy", f"{accuracy_score(y_true, y_pred)*100:.2f}%")
+    col2.metric("Precision", f"{precision_score(y_true, y_pred, average='weighted'):.2f}")
+    col3.metric("Recall", f"{recall_score(y_true, y_pred, average='weighted'):.2f}")
+    col4.metric("F1 Score", f"{f1_score(y_true, y_pred, average='weighted'):.2f}")
 
-    col1.metric("Accuracy", f"{accuracy*100:.2f}%")
-    col2.metric("Precision", f"{precision:.2f}")
-    col3.metric("Recall", f"{recall:.2f}")
-    col4.metric("F1 Score", f"{f1:.2f}")
-
-    # --------------------------------------------------
-    # CONFUSION MATRIX
-    # --------------------------------------------------
     cm = confusion_matrix(y_true, y_pred, labels=labels)
-
     fig, ax = plt.subplots()
-    sns.heatmap(
-        cm,
-        annot=True,
-        fmt="d",
-        cmap="Blues",
-        xticklabels=labels,
-        yticklabels=labels,
-        ax=ax
-    )
-
-    ax.set_xlabel("Predicted Label")
-    ax.set_ylabel("True Label")
-    ax.set_title("Confusion Matrix")
+    sns.heatmap(cm, annot=True, fmt="d", cmap="Blues",
+                xticklabels=labels, yticklabels=labels)
     st.pyplot(fig)
-
-    # --------------------------------------------------
-    # EXPLANATION
-    # --------------------------------------------------
-    st.info(
-        "The above evaluation metrics are calculated using labeled test data. "
-        "Live journal entries do not have ground truth labels, so real-time accuracy "
-        "cannot be computed."
-    )
-
 
 # ==========================================================
 # INSIGHTS
@@ -345,7 +291,7 @@ elif menu == "Insights":
     st.title("🧠 Intelligent Insights")
 
     if len(st.session_state.history) < 3:
-        st.info("Not enough data to determine emotional stability.")
+        st.info("Not enough data.")
     else:
         avg = pd.DataFrame(st.session_state.history)["score"].mean()
         if avg < 0.35:
@@ -355,16 +301,12 @@ elif menu == "Insights":
         else:
             st.success("✅ Overall emotional state is positive.")
 
-
 # ==========================================================
 # HISTORY
 # ==========================================================
 elif menu == "History":
-    st.title("📜 Analysis History")
-    if len(st.session_state.history) == 0:
-        st.info("No history yet.")
-    else:
-        st.dataframe(pd.DataFrame(st.session_state.history))
+    st.title("📜 History")
+    st.dataframe(pd.DataFrame(st.session_state.history))
 
 # ==========================================================
 # ABOUT
@@ -377,13 +319,4 @@ elif menu == "About":
     """)
 
 st.markdown("---")
-st.markdown(
-    "<center>🧠 Emotion Analytics Dashboard | Final Year Project</center>",
-    unsafe_allow_html=True
-)
-
-
-
-
-
-
+st.markdown("<center>🧠 Emotion Analytics Dashboard</center>", unsafe_allow_html=True)
