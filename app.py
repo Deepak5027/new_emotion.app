@@ -1,6 +1,6 @@
 # ==========================================================
 # EMOTION ANALYTICS FROM JOURNAL APPS
-# FULL STREAMLIT DASHBOARD (FINAL – STABLE)
+# FINAL STREAMLIT DASHBOARD (ERROR FIXED)
 # ==========================================================
 
 import streamlit as st
@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import plotly.graph_objects as go
 from datetime import datetime
+from collections import Counter
 from wordcloud import WordCloud
 
 from sklearn.metrics import (
@@ -24,8 +25,6 @@ from sklearn.metrics import (
     roc_auc_score
 )
 from sklearn.preprocessing import label_binarize
-from sklearn.svm import SVC
-from sklearn.model_selection import GridSearchCV
 
 # ----------------------------------------------------------
 # PAGE CONFIG
@@ -76,16 +75,10 @@ def detect_emotions(text):
     return scores
 
 # ----------------------------------------------------------
-# ✅ SAFE SENTIMENT SCORE (FIXED)
+# SENTIMENT SCORE
 # ----------------------------------------------------------
 def sentiment_score(sentiment):
-    sentiment = str(sentiment).strip().capitalize()
-    score_map = {
-        "Positive": 0.8,
-        "Neutral": 0.5,
-        "Negative": 0.2
-    }
-    return score_map.get(sentiment, 0.5)  # fallback safe
+    return {"Positive": 0.8, "Neutral": 0.5, "Negative": 0.2}[sentiment]
 
 # ----------------------------------------------------------
 # SESSION STATE
@@ -124,7 +117,7 @@ if menu == "Overview":
     col4.metric("Platform", "Streamlit")
 
 # ==========================================================
-# LIVE JOURNAL ANALYSIS (FULLY FIXED)
+# LIVE JOURNAL ANALYSIS (FIXED)
 # ==========================================================
 elif menu == "Live Journal Analysis":
     st.title("✍️ Live Journal Entry Analysis")
@@ -135,17 +128,15 @@ elif menu == "Live Journal Analysis":
         clean = clean_text(text)
         vec = vectorizer.transform([clean])
 
+        # ML prediction
         pred_encoded = svm_model.predict(vec)
         sentiment = label_encoder.inverse_transform(pred_encoded)[0]
-        sentiment = str(sentiment).strip().capitalize()
 
+        # Emotion detection
         emotions = detect_emotions(clean)
-        primary_emotion = (
-            max(emotions, key=emotions.get)
-            if sum(emotions.values()) > 0
-            else "Neutral"
-        )
+        primary_emotion = max(emotions, key=emotions.get) if sum(emotions.values()) > 0 else "Neutral"
 
+        # Smart refinement
         positive_words = ["happy", "excited", "grateful", "relaxed", "joy", "peace"]
         negative_words = ["sad", "angry", "hopeless", "depressed", "panic", "stress"]
 
@@ -226,52 +217,52 @@ elif menu == "Word & Text Analysis":
         st.warning("No entries available.")
 
 # ==========================================================
-# MODEL EVALUATION + HYPERPARAMETER TUNING
+# MODEL EVALUATION (FULLY FIXED)
 # ==========================================================
 elif menu == "Model Evaluation":
     st.title("📉 Model Evaluation")
 
-    file = st.file_uploader("Upload CSV (text, sentiment)", type=["csv"])
+    file = st.file_uploader("Upload CSV with columns: text, sentiment", type=["csv"])
+
     if file:
         df = pd.read_csv(file)
         df["clean_text"] = df["text"].apply(clean_text)
 
         X = vectorizer.transform(df["clean_text"])
-        y_true = label_encoder.transform(df["sentiment"])
-        y_pred = svm_model.predict(X)
+
+        # ✅ FIX: Encode y_true properly
+        y_true_encoded = label_encoder.transform(df["sentiment"])
+        y_pred_encoded = svm_model.predict(X)
 
         col1, col2, col3, col4 = st.columns(4)
-        col1.metric("Accuracy", f"{accuracy_score(y_true, y_pred)*100:.2f}%")
-        col2.metric("Precision", f"{precision_score(y_true, y_pred, average='weighted', zero_division=0):.2f}")
-        col3.metric("Recall", f"{recall_score(y_true, y_pred, average='weighted', zero_division=0):.2f}")
-        col4.metric("F1 Score", f"{f1_score(y_true, y_pred, average='weighted', zero_division=0):.2f}")
+        col1.metric("Accuracy", f"{accuracy_score(y_true_encoded, y_pred_encoded)*100:.2f}%")
+        col2.metric("Precision", f"{precision_score(y_true_encoded, y_pred_encoded, average='weighted', zero_division=0):.2f}")
+        col3.metric("Recall", f"{recall_score(y_true_encoded, y_pred_encoded, average='weighted', zero_division=0):.2f}")
+        col4.metric("F1 Score", f"{f1_score(y_true_encoded, y_pred_encoded, average='weighted', zero_division=0):.2f}")
 
-        cm = confusion_matrix(y_true, y_pred)
+        labels = label_encoder.classes_
+        cm = confusion_matrix(y_true_encoded, y_pred_encoded)
+
         fig_cm, ax_cm = plt.subplots()
         sns.heatmap(cm, annot=True, fmt="d", cmap="Blues",
-                    xticklabels=label_encoder.classes_,
-                    yticklabels=label_encoder.classes_)
+                    xticklabels=labels, yticklabels=labels)
         st.pyplot(fig_cm)
 
-        st.markdown("---")
-        st.subheader("⚙️ Hyperparameter Tuning (SVM)")
+        # ROC–AUC (Safe)
+        if hasattr(svm_model, "decision_function"):
+            y_scores = svm_model.decision_function(X)
+            y_bin = label_binarize(y_true_encoded, classes=range(len(labels)))
 
-        with st.expander("Run GridSearchCV"):
-            C_vals = st.multiselect("C values", [0.1, 1, 10, 100], default=[1, 10])
-            kernels = st.multiselect("Kernels", ["linear", "rbf"], default=["linear"])
+            fig_roc, ax_roc = plt.subplots()
+            for i in range(len(labels)):
+                fpr, tpr, _ = roc_curve(y_bin[:, i], y_scores[:, i])
+                ax_roc.plot(fpr, tpr, label=labels[i])
 
-            if st.button("Run Tuning"):
-                grid = GridSearchCV(
-                    SVC(decision_function_shape="ovr"),
-                    {"C": C_vals, "kernel": kernels},
-                    scoring="f1_weighted",
-                    cv=3,
-                    n_jobs=-1
-                )
-                grid.fit(X, y_true)
-                st.success("Tuning completed")
-                st.json(grid.best_params_)
-                st.write(f"Best F1 Score: **{grid.best_score_:.3f}**")
+            ax_roc.plot([0, 1], [0, 1], "k--")
+            ax_roc.legend()
+            st.pyplot(fig_roc)
+
+            st.success(f"Weighted ROC–AUC: {roc_auc_score(y_bin, y_scores, average='weighted'):.2f}")
 
 # ==========================================================
 # INSIGHTS
