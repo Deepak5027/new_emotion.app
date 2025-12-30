@@ -81,8 +81,12 @@ def detect_emotions(text):
 # SENTIMENT SCORE
 # ----------------------------------------------------------
 def sentiment_score(sentiment):
-    return {"Positive": 0.8, "Neutral": 0.5, "Negative": 0.2}[sentiment]
-
+    sentiment = sentiment.capitalize()
+    score_map = {
+        "Positive": 0.8,
+        "Neutral":0.5,
+        "Negative":0.2
+    return score_map.get(sentiment, 0.5)
 # ----------------------------------------------------------
 # SESSION STATE
 # ----------------------------------------------------------
@@ -317,4 +321,5 @@ elif menu == "About":
 
 st.markdown("---")
 st.markdown("<center>🧠 Emotion Analytics Dashboard</center>", unsafe_allow_html=True)
+
 
