@@ -1,144 +1,319 @@
+# ==========================================================
+# EMOTION ANALYTICS FROM JOURNAL APPS
+# FINAL STREAMLIT DASHBOARD
+# ==========================================================
+
 import streamlit as st
 import pandas as pd
 import numpy as np
 import joblib
 import re
-from sklearn.metrics import classification_report, confusion_matrix, accuracy_score
 import matplotlib.pyplot as plt
 import seaborn as sns
+import plotly.graph_objects as go
+from datetime import datetime
+from collections import Counter
+from wordcloud import WordCloud
 
-# -------------------- PAGE CONFIG --------------------
+from sklearn.metrics import (
+    confusion_matrix,
+    accuracy_score,
+    precision_score,
+    recall_score,
+    f1_score,
+    roc_curve,
+    auc,
+    roc_auc_score
+)
+from sklearn.preprocessing import label_binarize
+from sklearn.model_selection import GridSearchCV
+from sklearn.svm import SVC
+
+# ----------------------------------------------------------
+# PAGE CONFIG
+# ----------------------------------------------------------
 st.set_page_config(
-    page_title="Emotion & Sentiment Analyzer",
+    page_title="Emotion Analytics for Mental Health",
+    page_icon="🧠",
     layout="wide"
 )
 
-# -------------------- LOAD MODELS --------------------
+# ----------------------------------------------------------
+# LOAD MODEL FILES
+# ----------------------------------------------------------
 @st.cache_resource
-def load_models():
-    svm_model = joblib.load("models/svm_model.pkl")
-    vectorizer = joblib.load("models/vectorizer.pkl")
-    label_encoder = joblib.load("models/label_encoder.pkl")
+def load_assets():
+    svm_model = joblib.load("svm_sentiment_model.joblib")
+    vectorizer = joblib.load("tfidf_vectorizer.joblib")
+    label_encoder = joblib.load("label_encoder.joblib")
     return svm_model, vectorizer, label_encoder
 
-svm_model, vectorizer, label_encoder = load_models()
+svm_model, vectorizer, label_encoder = load_assets()
 
-# -------------------- TEXT CLEANING --------------------
+# ----------------------------------------------------------
+# TEXT CLEANING
+# ----------------------------------------------------------
 def clean_text(text):
     text = text.lower()
-    text = re.sub(r"http\S+", "", text)
     text = re.sub(r"[^a-z\s]", "", text)
-    text = re.sub(r"\s+", " ", text).strip()
     return text
 
-# -------------------- SENTIMENT PREDICTION --------------------
-def predict_sentiment(text):
-    text = clean_text(text)
-    X = vectorizer.transform([text])
+# ----------------------------------------------------------
+# EMOTION KEYWORDS
+# ----------------------------------------------------------
+emotion_keywords = {
+    "Joy": ["happy", "joy", "excited", "grateful", "pleased"],
+    "Sadness": ["sad", "lonely", "hopeless", "cry", "down"],
+    "Anger": ["angry", "frustrated", "irritated", "mad"],
+    "Fear": ["anxious", "worried", "panic", "scared", "stress"],
+    "Calm": ["calm", "peace", "relaxed", "content"]
+}
 
-    # SAFE prediction (NO predict_proba)
-    decision_scores = svm_model.decision_function(X)
+def detect_emotions(text):
+    scores = {emo: 0 for emo in emotion_keywords}
+    for emo, words in emotion_keywords.items():
+        for w in words:
+            if w in text:
+                scores[emo] += 1
+    return scores
 
-    if len(decision_scores.shape) == 1:
-        score = decision_scores[0]
-    else:
-        score = np.max(decision_scores)
+# ----------------------------------------------------------
+# SENTIMENT SCORE
+# ----------------------------------------------------------
+def sentiment_score(sentiment):
+    return {"Positive": 0.8, "Neutral": 0.5, "Negative": 0.2}[sentiment]
 
-    # Threshold logic
-    if score > 0.3:
-        return "Positive"
-    elif score < -0.3:
-        return "Negative"
-    else:
-        return "Neutral"
+# ----------------------------------------------------------
+# SESSION STATE
+# ----------------------------------------------------------
+if "history" not in st.session_state:
+    st.session_state.history = []
 
-# -------------------- SIDEBAR --------------------
-st.sidebar.title("Navigation")
-page = st.sidebar.radio(
-    "Select Section",
-    ["Live Journal Analysis", "Model Evaluation"]
+# ----------------------------------------------------------
+# SIDEBAR
+# ----------------------------------------------------------
+st.sidebar.title("📊 Dashboard Menu")
+menu = st.sidebar.radio(
+    "Navigate",
+    [
+        "Overview",
+        "Live Journal Analysis",
+        "Emotion Analytics",
+        "Trend & Timeline",
+        "Word & Text Analysis",
+        "Model Evaluation",
+        "Insights",
+        "History",
+        "About"
+    ]
 )
 
-# =====================================================
-# 📝 LIVE JOURNAL ANALYSIS
-# =====================================================
-if page == "Live Journal Analysis":
+# ==========================================================
+# OVERVIEW
+# ==========================================================
+if menu == "Overview":
+    st.title("🧠 Emotion Analytics for Early Mental Health Detection")
 
-    st.title("📝 Live Journal Sentiment Analysis")
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("Model", "SVM")
+    col2.metric("Features", "TF-IDF")
+    col3.metric("Evaluation", "ROC–AUC")
+    col4.metric("Platform", "Streamlit")
 
-    user_text = st.text_area(
-        "Write your thoughts below 👇",
-        height=200,
-        placeholder="I feel happy today because I achieved my goals..."
-    )
+# ==========================================================
+# LIVE JOURNAL ANALYSIS (FIXED)
+# ==========================================================
+elif menu == "Live Journal Analysis":
+    st.title("✍️ Live Journal Entry Analysis")
 
-    if st.button("Analyze Emotion"):
-        if user_text.strip() == "":
-            st.warning("Please enter some text.")
-        else:
-            sentiment = predict_sentiment(user_text)
+    text = st.text_area("Enter your journal entry:", height=180)
 
-            if sentiment == "Positive":
-                st.success("😊 Positive Emotion Detected")
-            elif sentiment == "Negative":
-                st.error("😞 Negative Emotion Detected")
-            else:
-                st.info("😐 Neutral Emotion Detected")
+    if st.button("Analyze Entry") and text.strip():
+        clean = clean_text(text)
+        vec = vectorizer.transform([clean])
 
-# =====================================================
-# 📊 MODEL EVALUATION
-# =====================================================
-if page == "Model Evaluation":
+        # 1️⃣ ML Prediction (Primary)
+        pred = svm_model.predict(vec)
+        sentiment = label_encoder.inverse_transform(pred)[0]
 
-    st.title("📊 Model Evaluation")
+        # 2️⃣ Emotion Detection
+        emotions = detect_emotions(clean)
+        primary_emotion = (
+            max(emotions, key=emotions.get)
+            if sum(emotions.values()) > 0
+            else "Neutral"
+        )
 
-    st.write("Upload CSV with columns: **text**, **sentiment**")
+        # 3️⃣ Smart Refinement (ONLY if Neutral)
+        positive_words = ["happy", "excited", "grateful", "relaxed", "joy", "peace"]
+        negative_words = ["sad", "angry", "hopeless", "depressed", "panic", "stress"]
 
-    uploaded_file = st.file_uploader(
-        "Upload CSV file",
+        if sentiment == "Neutral":
+            if any(w in clean for w in positive_words):
+                sentiment = "Positive"
+            elif any(w in clean for w in negative_words):
+                sentiment = "Negative"
+
+        if sentiment == "Neutral":
+            if primary_emotion in ["Joy", "Calm"]:
+                sentiment = "Positive"
+            elif primary_emotion in ["Sadness", "Anger", "Fear"]:
+                sentiment = "Negative"
+
+        score = sentiment_score(sentiment)
+
+        st.session_state.history.append({
+            "time": datetime.now(),
+            "text": text,
+            "sentiment": sentiment,
+            "emotion": primary_emotion,
+            "score": score
+        })
+
+        st.success(f"Sentiment: **{sentiment}**")
+        st.info(f"Primary Emotion: **{primary_emotion}**")
+
+        fig = go.Figure(go.Indicator(
+            mode="gauge+number",
+            value=score,
+            title={"text": "Sentiment Score"},
+            gauge={"axis": {"range": [0, 1]}}
+        ))
+        st.plotly_chart(fig, use_container_width=True)
+
+# ==========================================================
+# EMOTION ANALYTICS
+# ==========================================================
+elif menu == "Emotion Analytics":
+    st.title("📊 Emotion Analytics")
+
+    if st.session_state.history:
+        df = pd.DataFrame(st.session_state.history)
+        fig, ax = plt.subplots()
+        df["emotion"].value_counts().plot(kind="bar", ax=ax)
+        st.pyplot(fig)
+    else:
+        st.warning("No data available.")
+
+# ==========================================================
+# TREND & TIMELINE
+# ==========================================================
+elif menu == "Trend & Timeline":
+    st.title("📈 Sentiment Trend")
+
+    if st.session_state.history:
+        df = pd.DataFrame(st.session_state.history)
+        fig, ax = plt.subplots()
+        ax.plot(df["time"], df["score"], marker="o")
+        ax.set_ylim(0, 1)
+        st.pyplot(fig)
+    else:
+        st.info("No data yet.")
+
+# ==========================================================
+# WORD & TEXT ANALYSIS
+# ==========================================================
+elif menu == "Word & Text Analysis":
+    st.title("📝 Word & Text Analysis")
+
+    if st.session_state.history:
+        df = pd.DataFrame(st.session_state.history)
+        text_all = " ".join(df["text"].apply(clean_text))
+        wc = WordCloud(width=900, height=400).generate(text_all)
+        fig, ax = plt.subplots()
+        ax.imshow(wc)
+        ax.axis("off")
+        st.pyplot(fig)
+    else:
+        st.warning("No entries available.")
+
+# ==========================================================
+# MODEL EVALUATION (SAFE ROC)
+# ==========================================================
+elif menu == "Model Evaluation":
+    st.title("📉 Model Evaluation")
+
+    file = st.file_uploader(
+        "Upload CSV with columns: text, sentiment",
         type=["csv"]
     )
 
-    if uploaded_file:
-        df = pd.read_csv(uploaded_file)
+    if file:
+        df = pd.read_csv(file)
+        df["clean_text"] = df["text"].apply(clean_text)
 
-        if not {"text", "sentiment"}.issubset(df.columns):
-            st.error("CSV must contain 'text' and 'sentiment' columns")
+        X = vectorizer.transform(df["clean_text"])
+        y_true = df["sentiment"]
+        y_pred = svm_model.predict(X)
+
+        col1, col2, col3, col4 = st.columns(4)
+        col1.metric("Accuracy", f"{accuracy_score(y_true, y_pred)*100:.2f}%")
+        col2.metric("Precision", f"{precision_score(y_true, y_pred, average='weighted'):.2f}")
+        col3.metric("Recall", f"{recall_score(y_true, y_pred, average='weighted'):.2f}")
+        col4.metric("F1 Score", f"{f1_score(y_true, y_pred, average='weighted'):.2f}")
+
+        labels = label_encoder.classes_
+        cm = confusion_matrix(y_true, y_pred, labels=labels)
+
+        fig_cm, ax_cm = plt.subplots()
+        sns.heatmap(cm, annot=True, fmt="d", cmap="Blues",
+                    xticklabels=labels, yticklabels=labels)
+        st.pyplot(fig_cm)
+
+        # ROC–AUC (Safe)
+        if hasattr(svm_model, "predict_proba"):
+            y_proba = svm_model.predict_proba(X)
+            y_bin = label_binarize(y_true, classes=labels)
+
+            fig_roc, ax_roc = plt.subplots()
+            for i in range(len(labels)):
+                fpr, tpr, _ = roc_curve(y_bin[:, i], y_proba[:, i])
+                ax_roc.plot(fpr, tpr, label=labels[i])
+
+            ax_roc.plot([0, 1], [0, 1], "k--")
+            ax_roc.legend()
+            st.pyplot(fig_roc)
+
+            st.success(
+                f"Weighted ROC–AUC: "
+                f"{roc_auc_score(y_bin, y_proba, average='weighted'):.2f}"
+            )
         else:
-            df["text"] = df["text"].astype(str).apply(clean_text)
-
-            X = vectorizer.transform(df["text"])
-            y_true = label_encoder.transform(df["sentiment"])
-
-            # Use predict(), NOT predict_proba()
-            y_pred = svm_model.predict(X)
-
-            acc = accuracy_score(y_true, y_pred)
-            st.success(f"Accuracy: {acc:.4f}")
-
-            # Classification Report
-            st.subheader("Classification Report")
-            report = classification_report(
-                y_true,
-                y_pred,
-                target_names=label_encoder.classes_,
-                output_dict=True
+            st.warning(
+                "ROC–AUC unavailable. Model was trained without probability=True."
             )
-            st.dataframe(pd.DataFrame(report).transpose())
 
-            # Confusion Matrix
-            st.subheader("Confusion Matrix")
-            cm = confusion_matrix(y_true, y_pred)
+# ==========================================================
+# INSIGHTS
+# ==========================================================
+elif menu == "Insights":
+    st.title("🧠 Insights")
 
-            fig, ax = plt.subplots()
-            sns.heatmap(
-                cm,
-                annot=True,
-                fmt="d",
-                cmap="Blues",
-                xticklabels=label_encoder.classes_,
-                yticklabels=label_encoder.classes_
-            )
-            plt.xlabel("Predicted")
-            plt.ylabel("Actual")
-            st.pyplot(fig)
+    if len(st.session_state.history) >= 3:
+        avg = pd.DataFrame(st.session_state.history)["score"].mean()
+        if avg < 0.35:
+            st.error("⚠️ Strong negative trend detected.")
+        elif avg < 0.65:
+            st.warning("⚠️ Emotional instability detected.")
+        else:
+            st.success("✅ Positive emotional trend.")
+    else:
+        st.info("Not enough data.")
+
+# ==========================================================
+# HISTORY
+# ==========================================================
+elif menu == "History":
+    st.dataframe(pd.DataFrame(st.session_state.history))
+
+# ==========================================================
+# ABOUT
+# ==========================================================
+elif menu == "About":
+    st.markdown("""
+    **Emotion Analytics from Journal Apps for Early Mental Health Detection**  
+    Final Year Project using NLP & Machine Learning
+    """)
+
+st.markdown("---")
+st.markdown("<center>🧠 Emotion Analytics Dashboard</center>", unsafe_allow_html=True)
