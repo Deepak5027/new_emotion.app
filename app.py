@@ -1,6 +1,6 @@
 # ==========================================================
 # EMOTION ANALYTICS FROM JOURNAL APPS
-# FINAL STREAMLIT DASHBOARD
+# FINAL STREAMLIT DASHBOARD (FULL + FIXED)
 # ==========================================================
 
 import streamlit as st
@@ -22,7 +22,6 @@ from sklearn.metrics import (
     recall_score,
     f1_score,
     roc_curve,
-    auc,
     roc_auc_score
 )
 from sklearn.preprocessing import label_binarize
@@ -54,7 +53,7 @@ svm_model, vectorizer, label_encoder = load_assets()
 # TEXT CLEANING
 # ----------------------------------------------------------
 def clean_text(text):
-    text = text.lower()
+    text = str(text).lower()
     text = re.sub(r"[^a-z\s]", "", text)
     return text
 
@@ -113,7 +112,6 @@ menu = st.sidebar.radio(
 # ==========================================================
 if menu == "Overview":
     st.title("🧠 Emotion Analytics for Early Mental Health Detection")
-
     col1, col2, col3, col4 = st.columns(4)
     col1.metric("Model", "SVM")
     col2.metric("Features", "TF-IDF")
@@ -121,7 +119,7 @@ if menu == "Overview":
     col4.metric("Platform", "Streamlit")
 
 # ==========================================================
-# LIVE JOURNAL ANALYSIS (FIXED)
+# LIVE JOURNAL ANALYSIS
 # ==========================================================
 elif menu == "Live Journal Analysis":
     st.title("✍️ Live Journal Entry Analysis")
@@ -132,19 +130,12 @@ elif menu == "Live Journal Analysis":
         clean = clean_text(text)
         vec = vectorizer.transform([clean])
 
-        # 1️⃣ ML Prediction (Primary)
-        pred = svm_model.predict(vec)
-        sentiment = label_encoder.inverse_transform(pred)[0]
+        pred_encoded = svm_model.predict(vec)
+        sentiment = label_encoder.inverse_transform(pred_encoded)[0]
 
-        # 2️⃣ Emotion Detection
         emotions = detect_emotions(clean)
-        primary_emotion = (
-            max(emotions, key=emotions.get)
-            if sum(emotions.values()) > 0
-            else "Neutral"
-        )
+        primary_emotion = max(emotions, key=emotions.get) if sum(emotions.values()) > 0 else "Neutral"
 
-        # 3️⃣ Smart Refinement (ONLY if Neutral)
         positive_words = ["happy", "excited", "grateful", "relaxed", "joy", "peace"]
         negative_words = ["sad", "angry", "hopeless", "depressed", "panic", "stress"]
 
@@ -186,7 +177,6 @@ elif menu == "Live Journal Analysis":
 # ==========================================================
 elif menu == "Emotion Analytics":
     st.title("📊 Emotion Analytics")
-
     if st.session_state.history:
         df = pd.DataFrame(st.session_state.history)
         fig, ax = plt.subplots()
@@ -200,7 +190,6 @@ elif menu == "Emotion Analytics":
 # ==========================================================
 elif menu == "Trend & Timeline":
     st.title("📈 Sentiment Trend")
-
     if st.session_state.history:
         df = pd.DataFrame(st.session_state.history)
         fig, ax = plt.subplots()
@@ -215,11 +204,10 @@ elif menu == "Trend & Timeline":
 # ==========================================================
 elif menu == "Word & Text Analysis":
     st.title("📝 Word & Text Analysis")
-
     if st.session_state.history:
         df = pd.DataFrame(st.session_state.history)
-        text_all = " ".join(df["text"].apply(clean_text))
-        wc = WordCloud(width=900, height=400).generate(text_all)
+        all_text = " ".join(df["text"].apply(clean_text))
+        wc = WordCloud(width=900, height=400, background_color="white").generate(all_text)
         fig, ax = plt.subplots()
         ax.imshow(wc)
         ax.axis("off")
@@ -228,79 +216,86 @@ elif menu == "Word & Text Analysis":
         st.warning("No entries available.")
 
 # ==========================================================
-# MODEL EVALUATION (SAFE ROC)
+# MODEL EVALUATION + HYPERPARAMETER TUNING
 # ==========================================================
 elif menu == "Model Evaluation":
     st.title("📉 Model Evaluation")
 
-    file = st.file_uploader(
-        "Upload CSV with columns: text, sentiment",
-        type=["csv"]
-    )
+    file = st.file_uploader("Upload CSV with columns: text, sentiment", type=["csv"])
 
     if file:
         df = pd.read_csv(file)
         df["clean_text"] = df["text"].apply(clean_text)
 
         X = vectorizer.transform(df["clean_text"])
-        y_true = df["sentiment"]
-        y_pred = svm_model.predict(X)
+        y_true_encoded = label_encoder.transform(df["sentiment"])
+        y_pred_encoded = svm_model.predict(X)
 
         col1, col2, col3, col4 = st.columns(4)
-        col1.metric("Accuracy", f"{accuracy_score(y_true, y_pred)*100:.2f}%")
-        col2.metric("Precision", f"{precision_score(y_true, y_pred, average='weighted'):.2f}")
-        col3.metric("Recall", f"{recall_score(y_true, y_pred, average='weighted'):.2f}")
-        col4.metric("F1 Score", f"{f1_score(y_true, y_pred, average='weighted'):.2f}")
+        col1.metric("Accuracy", f"{accuracy_score(y_true_encoded, y_pred_encoded)*100:.2f}%")
+        col2.metric("Precision", f"{precision_score(y_true_encoded, y_pred_encoded, average='weighted', zero_division=0):.2f}")
+        col3.metric("Recall", f"{recall_score(y_true_encoded, y_pred_encoded, average='weighted', zero_division=0):.2f}")
+        col4.metric("F1 Score", f"{f1_score(y_true_encoded, y_pred_encoded, average='weighted', zero_division=0):.2f}")
 
         labels = label_encoder.classes_
-        cm = confusion_matrix(y_true, y_pred, labels=labels)
+        cm = confusion_matrix(y_true_encoded, y_pred_encoded)
 
         fig_cm, ax_cm = plt.subplots()
         sns.heatmap(cm, annot=True, fmt="d", cmap="Blues",
                     xticklabels=labels, yticklabels=labels)
         st.pyplot(fig_cm)
 
-        # ROC–AUC (Safe)
-        # ROC–AUC (SAFE FIX – NO ERROR)
-try:
-    if svm_model.probability:
-        y_proba = svm_model.predict_proba(X)
-        y_bin = label_binarize(y_true, classes=labels)
+        if hasattr(svm_model, "decision_function"):
+            y_scores = svm_model.decision_function(X)
+            y_bin = label_binarize(y_true_encoded, classes=range(len(labels)))
 
-        fig_roc, ax_roc = plt.subplots()
-        for i in range(len(labels)):
-            fpr, tpr, _ = roc_curve(y_bin[:, i], y_proba[:, i])
-            ax_roc.plot(fpr, tpr, label=labels[i])
+            fig_roc, ax_roc = plt.subplots()
+            for i, label in enumerate(labels):
+                fpr, tpr, _ = roc_curve(y_bin[:, i], y_scores[:, i])
+                ax_roc.plot(fpr, tpr, label=label)
 
-        ax_roc.plot([0, 1], [0, 1], "k--")
-        ax_roc.set_xlabel("False Positive Rate")
-        ax_roc.set_ylabel("True Positive Rate")
-        ax_roc.legend()
-        st.pyplot(fig_roc)
+            ax_roc.plot([0, 1], [0, 1], "k--")
+            ax_roc.legend()
+            st.pyplot(fig_roc)
 
-        st.success(
-            f"Weighted ROC–AUC: "
-            f"{roc_auc_score(y_bin, y_proba, average='weighted'):.2f}"
-        )
-    else:
-        st.warning(
-            "ROC–AUC unavailable. "
-            "SVM was trained with probability=False."
-        )
+            st.success(f"Weighted ROC–AUC: {roc_auc_score(y_bin, y_scores, average='weighted'):.2f}")
 
-except AttributeError:
-    st.warning(
-        "ROC–AUC unavailable. "
-        "This SVM model does not support probability estimates."
-    )
+        st.markdown("---")
+        st.subheader("⚙️ Hyperparameter Tuning (SVM)")
 
+        with st.expander("Run GridSearchCV"):
+            C_vals = st.multiselect("C values", [0.1, 1, 10, 100], default=[1, 10])
+            kernels = st.multiselect("Kernels", ["linear", "rbf", "poly"], default=["linear", "rbf"])
+            gammas = st.multiselect("Gamma", ["scale", "auto"], default=["scale"])
+
+            if st.button("Run Hyperparameter Tuning"):
+                with st.spinner("Tuning model..."):
+                    grid = GridSearchCV(
+                        SVC(decision_function_shape="ovr"),
+                        param_grid={
+                            "C": C_vals,
+                            "kernel": kernels,
+                            "gamma": gammas
+                        },
+                        scoring="f1_weighted",
+                        cv=3,
+                        n_jobs=-1
+                    )
+                    grid.fit(X, y_true_encoded)
+
+                    st.success("Tuning completed")
+                    st.json(grid.best_params_)
+                    st.write(f"Best CV F1 Score: **{grid.best_score_:.3f}**")
+
+                    if st.checkbox("Use tuned model for this session"):
+                        svm_model = grid.best_estimator_
+                        st.success("Tuned model activated")
 
 # ==========================================================
 # INSIGHTS
 # ==========================================================
 elif menu == "Insights":
     st.title("🧠 Insights")
-
     if len(st.session_state.history) >= 3:
         avg = pd.DataFrame(st.session_state.history)["score"].mean()
         if avg < 0.35:
@@ -329,4 +324,3 @@ elif menu == "About":
 
 st.markdown("---")
 st.markdown("<center>🧠 Emotion Analytics Dashboard</center>", unsafe_allow_html=True)
-
