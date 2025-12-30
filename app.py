@@ -263,24 +263,26 @@ elif menu == "Model Evaluation":
         X = vectorizer.transform(df["clean_text"])
 
         # -------------------------------
-        # SAFE LABEL HANDLING
-        # -------------------------------
-        df["sentiment"] = (
-            df["sentiment"]
-            .astype(str)
-            .str.strip()
-            .str.capitalize()
-        )
+       # -------------------------------
+# SAFE LABEL HANDLING (FIXED)
+# -------------------------------
+df["sentiment"] = (
+    df["sentiment"]
+    .astype(str)
+    .str.strip()
+    .str.lower()
+)
 
-        valid_labels = set(label_encoder.classes_)
-        df = df[df["sentiment"].isin(valid_labels)]
+valid_labels = set(label_encoder.classes_)
+df = df[df["sentiment"].isin(valid_labels)]
 
-        if df.empty:
-            st.error(
-                f"No valid labels found.\n"
-                f"Expected labels: {list(valid_labels)}"
-            )
-            st.stop()
+if df.empty:
+    st.error(
+        f"No valid labels found.\n"
+        f"Expected labels: {list(valid_labels)}"
+    )
+    st.stop()
+
 
         # Encode labels
         y_true = label_encoder.transform(df["sentiment"])
@@ -400,6 +402,7 @@ elif menu == "About":
 
 st.markdown("---")
 st.markdown("<center>🧠 Emotion Analytics Dashboard</center>", unsafe_allow_html=True)
+
 
 
 
