@@ -240,51 +240,40 @@ elif menu == "Model Evaluation":
 
     st.info("Upload a CSV file with columns: text, sentiment")
 
-    file = st.file_uploader(
-        "Upload CSV",
-        type=["csv"]
-    )
+    file = st.file_uploader("Upload CSV", type=["csv"])
 
     if file is not None:
-        # -------------------------------
-        # LOAD DATA
-        # -------------------------------
         df = pd.read_csv(file)
 
         if "text" not in df.columns or "sentiment" not in df.columns:
             st.error("CSV must contain 'text' and 'sentiment' columns")
             st.stop()
 
-        # -------------------------------
-        # CLEAN TEXT
-        # -------------------------------
+        # Clean text
         df["clean_text"] = df["text"].astype(str).apply(clean_text)
-
         X = vectorizer.transform(df["clean_text"])
 
         # -------------------------------
-       # -------------------------------
-# SAFE LABEL HANDLING (FIXED)
-# -------------------------------
-df["sentiment"] = (
-    df["sentiment"]
-    .astype(str)
-    .str.strip()
-    .str.lower()
-)
+        # SAFE LABEL HANDLING (FIXED)
+        # -------------------------------
+        df["sentiment"] = (
+            df["sentiment"]
+            .astype(str)
+            .str.strip()
+            .str.lower()
+        )
 
-valid_labels = set(label_encoder.classes_)
-df = df[df["sentiment"].isin(valid_labels)]
+        valid_labels = set(label_encoder.classes_)
+        df = df[df["sentiment"].isin(valid_labels)]
 
-if df.empty:
-    st.error(
-        f"No valid labels found.\n"
-        f"Expected labels: {list(valid_labels)}"
-    )
-    st.stop()
+        if df.empty:
+            st.error(
+                f"No valid labels found.\n"
+                f"Expected labels: {list(valid_labels)}"
+            )
+            st.stop()
 
-
-        # Encode labels
+        # ✅ THESE LINES MUST ALIGN WITH df["sentiment"]
         y_true = label_encoder.transform(df["sentiment"])
         y_pred = svm_model.predict(X)
 
@@ -402,6 +391,7 @@ elif menu == "About":
 
 st.markdown("---")
 st.markdown("<center>🧠 Emotion Analytics Dashboard</center>", unsafe_allow_html=True)
+
 
 
 
