@@ -248,14 +248,32 @@ elif menu == "Model Evaluation":
         df["clean_text"] = df["text"].apply(clean_text)
 
         X = vectorizer.transform(df["clean_text"])
-        y_true_encoded = label_encoder.transform(df["sentiment"])
-        y_pred_encoded = svm_model.predict(X)
+        # Encode TRUE labels
+y_true_encoded = label_encoder.transform(df["sentiment"])
 
-        col1, col2, col3, col4 = st.columns(4)
-        col1.metric("Accuracy", f"{accuracy_score(y_true_encoded, y_pred_encoded)*100:.2f}%")
-        col2.metric("Precision", f"{precision_score(y_true_encoded, y_pred_encoded, average='weighted',zero_division=0):.2f}")
-        col3.metric("Recall", f"{recall_score(y_true_encoded, y_pred_encoded, average='weighted',zero_division=0):.2f}")
-        col4.metric("F1 Score", f"{f1_score(y_true_encoded, y_pred_encoded, average='weighted',zero_division=0):.2f}")
+# Predict encoded labels
+y_pred_encoded = svm_model.predict(X)
+
+col1.metric(
+    "Accuracy",
+    f"{accuracy_score(y_true_encoded, y_pred_encoded) * 100:.2f}%"
+)
+
+col2.metric(
+    "Precision",
+    f"{precision_score(y_true_encoded, y_pred_encoded, average='weighted', zero_division=0):.2f}"
+)
+
+col3.metric(
+    "Recall",
+    f"{recall_score(y_true_encoded, y_pred_encoded, average='weighted', zero_division=0):.2f}"
+)
+
+col4.metric(
+    "F1 Score",
+    f"{f1_score(y_true_encoded, y_pred_encoded, average='weighted', zero_division=0):.2f}"
+)
+
 
         labels = label_encoder.classes_
         cm = confusion_matrix(y_true_encoded, y_pred_encoded)
@@ -319,6 +337,7 @@ elif menu == "About":
 
 st.markdown("---")
 st.markdown("<center>🧠 Emotion Analytics Dashboard</center>", unsafe_allow_html=True)
+
 
 
 
