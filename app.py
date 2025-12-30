@@ -1,6 +1,6 @@
 # ==========================================================
 # EMOTION ANALYTICS FROM JOURNAL APPS
-# FINAL STREAMLIT DASHBOARD (FULL + FIXED)
+# FINAL STREAMLIT DASHBOARD (ERROR FIXED)
 # ==========================================================
 
 import streamlit as st
@@ -25,8 +25,6 @@ from sklearn.metrics import (
     roc_auc_score
 )
 from sklearn.preprocessing import label_binarize
-from sklearn.model_selection import GridSearchCV
-from sklearn.svm import SVC
 
 # ----------------------------------------------------------
 # PAGE CONFIG
@@ -119,7 +117,7 @@ if menu == "Overview":
     col4.metric("Platform", "Streamlit")
 
 # ==========================================================
-# LIVE JOURNAL ANALYSIS
+# LIVE JOURNAL ANALYSIS (FIXED)
 # ==========================================================
 elif menu == "Live Journal Analysis":
     st.title("✍️ Live Journal Entry Analysis")
@@ -130,12 +128,15 @@ elif menu == "Live Journal Analysis":
         clean = clean_text(text)
         vec = vectorizer.transform([clean])
 
+        # ML prediction
         pred_encoded = svm_model.predict(vec)
         sentiment = label_encoder.inverse_transform(pred_encoded)[0]
 
+        # Emotion detection
         emotions = detect_emotions(clean)
         primary_emotion = max(emotions, key=emotions.get) if sum(emotions.values()) > 0 else "Neutral"
 
+        # Smart refinement
         positive_words = ["happy", "excited", "grateful", "relaxed", "joy", "peace"]
         negative_words = ["sad", "angry", "hopeless", "depressed", "panic", "stress"]
 
@@ -216,38 +217,65 @@ elif menu == "Word & Text Analysis":
         st.warning("No entries available.")
 
 # ==========================================================
-# MODEL EVALUATION + HYPERPARAMETER TUNING
+# ==========================================================
+# MODEL EVALUATION + HYPERPARAMETER TUNING (FIXED)
 # ==========================================================
 elif menu == "Model Evaluation":
     st.title("📉 Model Evaluation")
 
-    file = st.file_uploader("Upload CSV with columns: text, sentiment", type=["csv"])
+    file = st.file_uploader(
+        "Upload CSV with columns: text, sentiment",
+        type=["csv"]
+    )
 
     if file:
         df = pd.read_csv(file)
         df["clean_text"] = df["text"].apply(clean_text)
 
         X = vectorizer.transform(df["clean_text"])
+
+        # ✅ Encode true labels
         y_true_encoded = label_encoder.transform(df["sentiment"])
         y_pred_encoded = svm_model.predict(X)
 
+        # ---------------- METRICS ----------------
         col1, col2, col3, col4 = st.columns(4)
-        col1.metric("Accuracy", f"{accuracy_score(y_true_encoded, y_pred_encoded)*100:.2f}%")
-        col2.metric("Precision", f"{precision_score(y_true_encoded, y_pred_encoded, average='weighted', zero_division=0):.2f}")
-        col3.metric("Recall", f"{recall_score(y_true_encoded, y_pred_encoded, average='weighted', zero_division=0):.2f}")
-        col4.metric("F1 Score", f"{f1_score(y_true_encoded, y_pred_encoded, average='weighted', zero_division=0):.2f}")
+        col1.metric(
+            "Accuracy",
+            f"{accuracy_score(y_true_encoded, y_pred_encoded)*100:.2f}%"
+        )
+        col2.metric(
+            "Precision",
+            f"{precision_score(y_true_encoded, y_pred_encoded, average='weighted', zero_division=0):.2f}"
+        )
+        col3.metric(
+            "Recall",
+            f"{recall_score(y_true_encoded, y_pred_encoded, average='weighted', zero_division=0):.2f}"
+        )
+        col4.metric(
+            "F1 Score",
+            f"{f1_score(y_true_encoded, y_pred_encoded, average='weighted', zero_division=0):.2f}"
+        )
 
+        # ---------------- CONFUSION MATRIX ----------------
         labels = label_encoder.classes_
         cm = confusion_matrix(y_true_encoded, y_pred_encoded)
 
         fig_cm, ax_cm = plt.subplots()
-        sns.heatmap(cm, annot=True, fmt="d", cmap="Blues",
-                    xticklabels=labels, yticklabels=labels)
+        sns.heatmap(
+            cm, annot=True, fmt="d", cmap="Blues",
+            xticklabels=labels, yticklabels=labels
+        )
+        ax_cm.set_title("Confusion Matrix")
         st.pyplot(fig_cm)
 
+        # ---------------- ROC–AUC ----------------
         if hasattr(svm_model, "decision_function"):
             y_scores = svm_model.decision_function(X)
-            y_bin = label_binarize(y_true_encoded, classes=range(len(labels)))
+            y_bin = label_binarize(
+                y_true_encoded,
+                classes=range(len(labels))
+            )
 
             fig_roc, ax_roc = plt.subplots()
             for i, label in enumerate(labels):
@@ -255,41 +283,74 @@ elif menu == "Model Evaluation":
                 ax_roc.plot(fpr, tpr, label=label)
 
             ax_roc.plot([0, 1], [0, 1], "k--")
+            ax_roc.set_title("ROC–AUC Curve")
             ax_roc.legend()
             st.pyplot(fig_roc)
 
-            st.success(f"Weighted ROC–AUC: {roc_auc_score(y_bin, y_scores, average='weighted'):.2f}")
+            st.success(
+                f"Weighted ROC–AUC: "
+                f"{roc_auc_score(y_bin, y_scores, average='weighted'):.2f}"
+            )
 
+        # ==================================================
+        # 🔥 HYPERPARAMETER TUNING UI
+        # ==================================================
         st.markdown("---")
         st.subheader("⚙️ Hyperparameter Tuning (SVM)")
 
         with st.expander("Run GridSearchCV"):
-            C_vals = st.multiselect("C values", [0.1, 1, 10, 100], default=[1, 10])
-            kernels = st.multiselect("Kernels", ["linear", "rbf", "poly"], default=["linear", "rbf"])
-            gammas = st.multiselect("Gamma", ["scale", "auto"], default=["scale"])
+            c_values = st.multiselect(
+                "Select C values",
+                [0.1, 1, 10, 100],
+                default=[1, 10]
+            )
+
+            kernel_values = st.multiselect(
+                "Select kernels",
+                ["linear", "rbf", "poly"],
+                default=["linear", "rbf"]
+            )
+
+            gamma_values = st.multiselect(
+                "Select gamma values (rbf/poly)",
+                ["scale", "auto"],
+                default=["scale"]
+            )
 
             if st.button("Run Hyperparameter Tuning"):
-                with st.spinner("Tuning model..."):
+                with st.spinner("Running GridSearchCV..."):
+                    param_grid = {
+                        "C": c_values,
+                        "kernel": kernel_values,
+                        "gamma": gamma_values
+                    }
+
+                    base_svm = SVC(decision_function_shape="ovr")
+
                     grid = GridSearchCV(
-                        SVC(decision_function_shape="ovr"),
-                        param_grid={
-                            "C": C_vals,
-                            "kernel": kernels,
-                            "gamma": gammas
-                        },
+                        base_svm,
+                        param_grid,
                         scoring="f1_weighted",
                         cv=3,
                         n_jobs=-1
                     )
+
                     grid.fit(X, y_true_encoded)
 
-                    st.success("Tuning completed")
-                    st.json(grid.best_params_)
-                    st.write(f"Best CV F1 Score: **{grid.best_score_:.3f}**")
+                    st.success("Tuning Completed ✅")
 
-                    if st.checkbox("Use tuned model for this session"):
+                    st.write("### ✅ Best Parameters")
+                    st.json(grid.best_params_)
+
+                    st.write(
+                        f"### 🏆 Best CV F1 Score: "
+                        f"**{grid.best_score_:.3f}**"
+                    )
+
+                    # Optional: use tuned model in app session
+                    if st.checkbox("Use tuned model for predictions (session only)"):
                         svm_model = grid.best_estimator_
-                        st.success("Tuned model activated")
+                        st.success("Tuned model activated for this session")
 
 # ==========================================================
 # INSIGHTS
