@@ -233,108 +233,138 @@ elif menu == "Word & Text Analysis":
         st.warning("No entries available.")
 
 # ==========================================================
-# MODEL EVALUATION
+# MODEL EVALUATION (FULLY SAFE & FINAL)
 # ==========================================================
 elif menu == "Model Evaluation":
     st.title("📉 Model Evaluation")
 
-    uploaded_file = st.file_uploader(
-        "Upload CSV file with columns: text, sentiment",
+    st.info("Upload a CSV file with columns: text, sentiment")
+
+    file = st.file_uploader(
+        "Upload CSV",
         type=["csv"]
     )
 
-    if uploaded_file is not None:
-        # Load dataset
-        df = pd.read_csv(uploaded_file)
+    if file is not None:
+        # -------------------------------
+        # LOAD DATA
+        # -------------------------------
+        df = pd.read_csv(file)
 
-        # Validate columns
         if "text" not in df.columns or "sentiment" not in df.columns:
             st.error("CSV must contain 'text' and 'sentiment' columns")
+            st.stop()
+
+        # -------------------------------
+        # CLEAN TEXT
+        # -------------------------------
+        df["clean_text"] = df["text"].astype(str).apply(clean_text)
+
+        X = vectorizer.transform(df["clean_text"])
+
+        # -------------------------------
+        # SAFE LABEL HANDLING
+        # -------------------------------
+        df["sentiment"] = (
+            df["sentiment"]
+            .astype(str)
+            .str.strip()
+            .str.capitalize()
+        )
+
+        valid_labels = set(label_encoder.classes_)
+        df = df[df["sentiment"].isin(valid_labels)]
+
+        if df.empty:
+            st.error(
+                f"No valid labels found.\n"
+                f"Expected labels: {list(valid_labels)}"
+            )
+            st.stop()
+
+        # Encode labels
+        y_true = label_encoder.transform(df["sentiment"])
+        y_pred = svm_model.predict(X)
+
+        # -------------------------------
+        # METRICS
+        # -------------------------------
+        col1, col2, col3, col4 = st.columns(4)
+
+        col1.metric(
+            "Accuracy",
+            f"{accuracy_score(y_true, y_pred) * 100:.2f}%"
+        )
+
+        col2.metric(
+            "Precision",
+            f"{precision_score(y_true, y_pred, average='weighted', zero_division=0):.2f}"
+        )
+
+        col3.metric(
+            "Recall",
+            f"{recall_score(y_true, y_pred, average='weighted', zero_division=0):.2f}"
+        )
+
+        col4.metric(
+            "F1 Score",
+            f"{f1_score(y_true, y_pred, average='weighted', zero_division=0):.2f}"
+        )
+
+        # -------------------------------
+        # CONFUSION MATRIX
+        # -------------------------------
+        st.subheader("Confusion Matrix")
+
+        labels = label_encoder.classes_
+        cm = confusion_matrix(y_true, y_pred)
+
+        fig_cm, ax_cm = plt.subplots(figsize=(6, 4))
+        sns.heatmap(
+            cm,
+            annot=True,
+            fmt="d",
+            cmap="Blues",
+            xticklabels=labels,
+            yticklabels=labels,
+            ax=ax_cm
+        )
+        ax_cm.set_xlabel("Predicted")
+        ax_cm.set_ylabel("Actual")
+        st.pyplot(fig_cm)
+
+        # -------------------------------
+        # ROC–AUC (ONLY IF AVAILABLE)
+        # -------------------------------
+        if hasattr(svm_model, "predict_proba"):
+            st.subheader("ROC–AUC Curve")
+
+            y_proba = svm_model.predict_proba(X)
+            y_bin = label_binarize(
+                y_true,
+                classes=range(len(labels))
+            )
+
+            fig_roc, ax_roc = plt.subplots(figsize=(6, 4))
+
+            for i, label in enumerate(labels):
+                fpr, tpr, _ = roc_curve(y_bin[:, i], y_proba[:, i])
+                ax_roc.plot(fpr, tpr, label=label)
+
+            ax_roc.plot([0, 1], [0, 1], "k--")
+            ax_roc.set_xlabel("False Positive Rate")
+            ax_roc.set_ylabel("True Positive Rate")
+            ax_roc.legend()
+            st.pyplot(fig_roc)
+
+            st.success(
+                f"Weighted ROC–AUC: "
+                f"{roc_auc_score(y_bin, y_proba, average='weighted'):.2f}"
+            )
         else:
-            # Clean text
-            df["clean_text"] = df["text"].apply(clean_text)
-
-            # Vectorize
-            X = vectorizer.transform(df["clean_text"])
-
-            # Encode true labels (IMPORTANT: numeric only)
-            y_true = label_encoder.transform(df["sentiment"])
-
-            # Predict (numeric)
-            y_pred = svm_model.predict(X)
-
-            # Metrics
-            col1, col2, col3, col4 = st.columns(4)
-
-            col1.metric(
-                "Accuracy",
-                f"{accuracy_score(y_true, y_pred) * 100:.2f}%"
+            st.warning(
+                "ROC–AUC unavailable (model trained without probability=True)"
             )
-            col2.metric(
-                "Precision",
-                f"{precision_score(y_true, y_pred, average='weighted', zero_division=0):.2f}"
-            )
-            col3.metric(
-                "Recall",
-                f"{recall_score(y_true, y_pred, average='weighted', zero_division=0):.2f}"
-            )
-            col4.metric(
-                "F1 Score",
-                f"{f1_score(y_true, y_pred, average='weighted', zero_division=0):.2f}"
-            )
-
-            # Confusion Matrix
-            labels = label_encoder.classes_
-            cm = confusion_matrix(y_true, y_pred)
-
-            fig_cm, ax_cm = plt.subplots(figsize=(6, 4))
-            sns.heatmap(
-                cm,
-                annot=True,
-                fmt="d",
-                cmap="Blues",
-                xticklabels=labels,
-                yticklabels=labels,
-                ax=ax_cm
-            )
-            ax_cm.set_xlabel("Predicted")
-            ax_cm.set_ylabel("Actual")
-            st.pyplot(fig_cm)
-
-            # ROC–AUC (Only if probability available)
-            if hasattr(svm_model, "predict_proba"):
-                y_proba = svm_model.predict_proba(X)
-
-                y_true_bin = label_binarize(
-                    y_true,
-                    classes=range(len(labels))
-                )
-
-                fig_roc, ax_roc = plt.subplots(figsize=(6, 4))
-
-                for i, label in enumerate(labels):
-                    fpr, tpr, _ = roc_curve(
-                        y_true_bin[:, i],
-                        y_proba[:, i]
-                    )
-                    ax_roc.plot(fpr, tpr, label=label)
-
-                ax_roc.plot([0, 1], [0, 1], "k--")
-                ax_roc.set_xlabel("False Positive Rate")
-                ax_roc.set_ylabel("True Positive Rate")
-                ax_roc.set_title("ROC Curve")
-                ax_roc.legend()
-                st.pyplot(fig_roc)
-
-                roc_auc = roc_auc_score(
-                    y_true_bin,
-                    y_proba,
-                    average="weighted",
-                    multi_class="ovr"
-                )
-
-                st.success(f"Weighted ROC–AUC: {roc_auc:.2f}")
-
 
 # ==========================================================
 # INSIGHTS
@@ -370,6 +400,7 @@ elif menu == "About":
 
 st.markdown("---")
 st.markdown("<center>🧠 Emotion Analytics Dashboard</center>", unsafe_allow_html=True)
+
 
 
 
