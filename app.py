@@ -233,85 +233,107 @@ elif menu == "Word & Text Analysis":
         st.warning("No entries available.")
 
 # ==========================================================
-# MODEL EVALUATION (SAFE ROC)
+# MODEL EVALUATION
 # ==========================================================
 elif menu == "Model Evaluation":
     st.title("📉 Model Evaluation")
 
-    file = st.file_uploader(
-        "Upload CSV with columns: text, sentiment",
+    uploaded_file = st.file_uploader(
+        "Upload CSV file with columns: text, sentiment",
         type=["csv"]
     )
 
-    if file is not None:
-        df = pd.read_csv(file)
-        df["clean_text"] = df["text"].apply(clean_text)
+    if uploaded_file is not None:
+        # Load dataset
+        df = pd.read_csv(uploaded_file)
 
-        X = vectorizer.transform(df["clean_text"])
+        # Validate columns
+        if "text" not in df.columns or "sentiment" not in df.columns:
+            st.error("CSV must contain 'text' and 'sentiment' columns")
+        else:
+            # Clean text
+            df["clean_text"] = df["text"].apply(clean_text)
 
-        # Encode TRUE labels
-        y_true_encoded = label_encoder.transform(df["sentiment"])
+            # Vectorize
+            X = vectorizer.transform(df["clean_text"])
 
-        # Predict encoded labels
-        y_pred_encoded = svm_model.predict(X)
+            # Encode true labels (IMPORTANT: numeric only)
+            y_true = label_encoder.transform(df["sentiment"])
 
-        # Metrics
-        col1, col2, col3, col4 = st.columns(4)
+            # Predict (numeric)
+            y_pred = svm_model.predict(X)
 
-        col1.metric(
-            "Accuracy",
-            f"{accuracy_score(y_true_encoded, y_pred_encoded) * 100:.2f}%"
-        )
-        col2.metric(
-            "Precision",
-            f"{precision_score(y_true_encoded, y_pred_encoded, average='weighted', zero_division=0):.2f}"
-        )
-        col3.metric(
-            "Recall",
-            f"{recall_score(y_true_encoded, y_pred_encoded, average='weighted', zero_division=0):.2f}"
-        )
-        col4.metric(
-            "F1 Score",
-            f"{f1_score(y_true_encoded, y_pred_encoded, average='weighted', zero_division=0):.2f}"
-        )
+            # Metrics
+            col1, col2, col3, col4 = st.columns(4)
 
-        # Confusion Matrix
-        labels = label_encoder.classes_
-        cm = confusion_matrix(y_true_encoded, y_pred_encoded)
-
-        fig_cm, ax_cm = plt.subplots()
-        sns.heatmap(
-            cm,
-            annot=True,
-            fmt="d",
-            cmap="Blues",
-            xticklabels=labels,
-            yticklabels=labels,
-            ax=ax_cm
-        )
-        st.pyplot(fig_cm)
-
-        # ROC–AUC (only if supported)
-        if hasattr(svm_model, "predict_proba"):
-            y_proba = svm_model.predict_proba(X)
-            y_bin = label_binarize(
-                y_true_encoded,
-                classes=range(len(labels))
+            col1.metric(
+                "Accuracy",
+                f"{accuracy_score(y_true, y_pred) * 100:.2f}%"
+            )
+            col2.metric(
+                "Precision",
+                f"{precision_score(y_true, y_pred, average='weighted', zero_division=0):.2f}"
+            )
+            col3.metric(
+                "Recall",
+                f"{recall_score(y_true, y_pred, average='weighted', zero_division=0):.2f}"
+            )
+            col4.metric(
+                "F1 Score",
+                f"{f1_score(y_true, y_pred, average='weighted', zero_division=0):.2f}"
             )
 
-            fig_roc, ax_roc = plt.subplots()
-            for i, label in enumerate(labels):
-                fpr, tpr, _ = roc_curve(y_bin[:, i], y_proba[:, i])
-                ax_roc.plot(fpr, tpr, label=label)
+            # Confusion Matrix
+            labels = label_encoder.classes_
+            cm = confusion_matrix(y_true, y_pred)
 
-            ax_roc.plot([0, 1], [0, 1], "k--")
-            ax_roc.legend()
-            st.pyplot(fig_roc)
-
-            st.success(
-                f"Weighted ROC–AUC: "
-                f"{roc_auc_score(y_bin, y_proba, average='weighted'):.2f}"
+            fig_cm, ax_cm = plt.subplots(figsize=(6, 4))
+            sns.heatmap(
+                cm,
+                annot=True,
+                fmt="d",
+                cmap="Blues",
+                xticklabels=labels,
+                yticklabels=labels,
+                ax=ax_cm
             )
+            ax_cm.set_xlabel("Predicted")
+            ax_cm.set_ylabel("Actual")
+            st.pyplot(fig_cm)
+
+            # ROC–AUC (Only if probability available)
+            if hasattr(svm_model, "predict_proba"):
+                y_proba = svm_model.predict_proba(X)
+
+                y_true_bin = label_binarize(
+                    y_true,
+                    classes=range(len(labels))
+                )
+
+                fig_roc, ax_roc = plt.subplots(figsize=(6, 4))
+
+                for i, label in enumerate(labels):
+                    fpr, tpr, _ = roc_curve(
+                        y_true_bin[:, i],
+                        y_proba[:, i]
+                    )
+                    ax_roc.plot(fpr, tpr, label=label)
+
+                ax_roc.plot([0, 1], [0, 1], "k--")
+                ax_roc.set_xlabel("False Positive Rate")
+                ax_roc.set_ylabel("True Positive Rate")
+                ax_roc.set_title("ROC Curve")
+                ax_roc.legend()
+                st.pyplot(fig_roc)
+
+                roc_auc = roc_auc_score(
+                    y_true_bin,
+                    y_proba,
+                    average="weighted",
+                    multi_class="ovr"
+                )
+
+                st.success(f"Weighted ROC–AUC: {roc_auc:.2f}")
 
 
 # ==========================================================
@@ -348,6 +370,7 @@ elif menu == "About":
 
 st.markdown("---")
 st.markdown("<center>🧠 Emotion Analytics Dashboard</center>", unsafe_allow_html=True)
+
 
 
 
