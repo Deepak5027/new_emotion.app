@@ -261,27 +261,39 @@ elif menu == "Model Evaluation":
         st.pyplot(fig_cm)
 
         # ROC–AUC (Safe)
-        if hasattr(svm_model, "predict_proba"):
-            y_proba = svm_model.predict_proba(X)
-            y_bin = label_binarize(y_true, classes=labels)
+        # ROC–AUC (SAFE FIX – NO ERROR)
+try:
+    if svm_model.probability:
+        y_proba = svm_model.predict_proba(X)
+        y_bin = label_binarize(y_true, classes=labels)
 
-            fig_roc, ax_roc = plt.subplots()
-            for i in range(len(labels)):
-                fpr, tpr, _ = roc_curve(y_bin[:, i], y_proba[:, i])
-                ax_roc.plot(fpr, tpr, label=labels[i])
+        fig_roc, ax_roc = plt.subplots()
+        for i in range(len(labels)):
+            fpr, tpr, _ = roc_curve(y_bin[:, i], y_proba[:, i])
+            ax_roc.plot(fpr, tpr, label=labels[i])
 
-            ax_roc.plot([0, 1], [0, 1], "k--")
-            ax_roc.legend()
-            st.pyplot(fig_roc)
+        ax_roc.plot([0, 1], [0, 1], "k--")
+        ax_roc.set_xlabel("False Positive Rate")
+        ax_roc.set_ylabel("True Positive Rate")
+        ax_roc.legend()
+        st.pyplot(fig_roc)
 
-            st.success(
-                f"Weighted ROC–AUC: "
-                f"{roc_auc_score(y_bin, y_proba, average='weighted'):.2f}"
-            )
-        else:
-            st.warning(
-                "ROC–AUC unavailable. Model was trained without probability=True."
-            )
+        st.success(
+            f"Weighted ROC–AUC: "
+            f"{roc_auc_score(y_bin, y_proba, average='weighted'):.2f}"
+        )
+    else:
+        st.warning(
+            "ROC–AUC unavailable. "
+            "SVM was trained with probability=False."
+        )
+
+except AttributeError:
+    st.warning(
+        "ROC–AUC unavailable. "
+        "This SVM model does not support probability estimates."
+    )
+
 
 # ==========================================================
 # INSIGHTS
@@ -317,3 +329,4 @@ elif menu == "About":
 
 st.markdown("---")
 st.markdown("<center>🧠 Emotion Analytics Dashboard</center>", unsafe_allow_html=True)
+
