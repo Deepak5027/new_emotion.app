@@ -1,4 +1,4 @@
-i want you to fix error in model evaluation part in this code and not change anything except the model evaluation error only:# ==========================================================
+# ==========================================================
 # EMOTION ANALYTICS FROM JOURNAL APPS
 # FINAL STREAMLIT DASHBOARD
 # ==========================================================
@@ -317,3 +317,4 @@ elif menu == "About":
 
 st.markdown("---")
 st.markdown("<center>🧠 Emotion Analytics Dashboard</center>", unsafe_allow_html=True)
+
