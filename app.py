@@ -249,13 +249,14 @@ elif menu == "Model Evaluation":
 
         X = vectorizer.transform(df["clean_text"])
         y_true = df["sentiment"]
-        y_pred = svm_model.predict(X)
+        y_pred_encoded = svm_model.predict(X)
+        y_pred = label_encoder.inverse_transform(y_pred_encoded)
 
         col1, col2, col3, col4 = st.columns(4)
         col1.metric("Accuracy", f"{accuracy_score(y_true, y_pred)*100:.2f}%")
-        col2.metric("Precision", f"{precision_score(y_true, y_pred, average='weighted'):.2f}")
-        col3.metric("Recall", f"{recall_score(y_true, y_pred, average='weighted'):.2f}")
-        col4.metric("F1 Score", f"{f1_score(y_true, y_pred, average='weighted'):.2f}")
+        col2.metric("Precision", f"{precision_score(y_true, y_pred, average='weighted',zero_division=0):.2f}")
+        col3.metric("Recall", f"{recall_score(y_true, y_pred, average='weighted',zero_division=0):.2f}")
+        col4.metric("F1 Score", f"{f1_score(y_true, y_pred, average='weighted',zero_division=0):.2f}")
 
         labels = label_encoder.classes_
         cm = confusion_matrix(y_true, y_pred, labels=labels)
@@ -322,6 +323,7 @@ elif menu == "About":
 
 st.markdown("---")
 st.markdown("<center>🧠 Emotion Analytics Dashboard</center>", unsafe_allow_html=True)
+
 
 
 
