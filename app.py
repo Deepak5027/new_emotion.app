@@ -208,35 +208,66 @@ elif menu == "Word & Text Analysis":
 elif menu == "Model Evaluation":
     st.title("📊 Model Evaluation")
 
-    file = st.file_uploader("Upload CSV (text,label)", type="csv")
+    uploaded_file = st.file_uploader(
+        "Upload CSV file (text + label columns)",
+        type=["csv"]
+    )
 
-    if file:
-        df = pd.read_csv(file)
+    if uploaded_file is not None:
+        df = pd.read_csv(uploaded_file)
 
-        X = df["text"].apply(clean_text)
-        y = df["label"]
+        st.subheader("🔍 Dataset Preview")
+        st.dataframe(df.head())
+
+        text_col = st.selectbox(
+            "Select TEXT column",
+            df.columns
+        )
+
+        label_col = st.selectbox(
+            "Select LABEL column",
+            df.columns
+        )
+
+        X = df[text_col].astype(str).apply(clean_text)
+        y = df[label_col].astype(str)
 
         X_train, X_test, y_train, y_test = train_test_split(
             X, y, test_size=0.2, random_state=42
         )
 
         X_test_vec = vectorizer.transform(X_test)
+
         y_pred = svm_model.predict(X_test_vec)
         y_pred = label_encoder.inverse_transform(y_pred)
+
+        st.subheader("📈 Performance Metrics")
 
         col1, col2, col3, col4 = st.columns(4)
         col1.metric("Accuracy", f"{accuracy_score(y_test, y_pred):.2f}")
         col2.metric("Precision", f"{precision_score(y_test, y_pred, average='weighted'):.2f}")
         col3.metric("Recall", f"{recall_score(y_test, y_pred, average='weighted'):.2f}")
-        col4.metric("F1", f"{f1_score(y_test, y_pred, average='weighted'):.2f}")
+        col4.metric("F1 Score", f"{f1_score(y_test, y_pred, average='weighted'):.2f}")
 
+        st.subheader("📋 Classification Report")
         st.text(classification_report(y_test, y_pred))
 
+        st.subheader("🧩 Confusion Matrix")
         cm = confusion_matrix(y_test, y_pred)
-        sns.heatmap(cm, annot=True, fmt="d",
-                    xticklabels=label_encoder.classes_,
-                    yticklabels=label_encoder.classes_)
-        st.pyplot(plt.gcf())
+
+        fig, ax = plt.subplots()
+        sns.heatmap(
+            cm,
+            annot=True,
+            fmt="d",
+            cmap="Blues",
+            xticklabels=label_encoder.classes_,
+            yticklabels=label_encoder.classes_,
+            ax=ax
+        )
+        ax.set_xlabel("Predicted")
+        ax.set_ylabel("Actual")
+        st.pyplot(fig)
 
 # ==========================================================
 # INSIGHTS
@@ -265,3 +296,4 @@ elif menu == "About":
 
 st.markdown("---")
 st.markdown("<center>🧠 Emotion Analytics Dashboard</center>", unsafe_allow_html=True)
+
