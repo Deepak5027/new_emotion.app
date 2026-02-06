@@ -244,7 +244,6 @@ elif menu == "Model Evaluation":
         .str.strip()
         .str.lower()
     )
-    st.write("Model Labels classes:",label_encoder.classes
 
     # Keep only labels known to model
     valid_labels = set(label_encoder.classes_)
@@ -337,6 +336,7 @@ elif menu == "About":
 
 st.markdown("---")
 st.markdown("<center>🧠 Emotion Analytics Dashboard</center>", unsafe_allow_html=True)
+
 
 
 
