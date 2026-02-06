@@ -240,10 +240,7 @@ label_col = st.selectbox(
 )
 
 
-    # Safety check
-    if text_col == label_col:
-        st.error("❌ Text column and Label column must be different")
-        st.stop()
+    # Safety che
 
     # Clean text
     X = df[text_col].astype(str).apply(clean_text)
@@ -347,6 +344,7 @@ elif menu == "About":
 
 st.markdown("---")
 st.markdown("<center>🧠 Emotion Analytics Dashboard</center>", unsafe_allow_html=True)
+
 
 
 
