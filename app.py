@@ -226,8 +226,19 @@ elif menu == "Model Evaluation":
     st.dataframe(df.head())
 
     # Column selection
-    text_col = st.selectbox("Select TEXT column", df.columns)
-    label_col = st.selectbox("Select LABEL column", df.columns)
+    # Column selection (AUTO FIXED)
+text_col = st.selectbox(
+    "Select TEXT column",
+    df.columns,
+    index=list(df.columns).index("text") if "text" in df.columns else 0
+)
+
+label_col = st.selectbox(
+    "Select LABEL column",
+    df.columns,
+    index=list(df.columns).index("sentiment") if "sentiment" in df.columns else 1
+)
+
 
     # Safety check
     if text_col == label_col:
@@ -336,6 +347,7 @@ elif menu == "About":
 
 st.markdown("---")
 st.markdown("<center>🧠 Emotion Analytics Dashboard</center>", unsafe_allow_html=True)
+
 
 
 
