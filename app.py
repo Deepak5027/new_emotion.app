@@ -123,6 +123,23 @@ menu = st.sidebar.radio("Navigate", [
 if menu == "Overview":
     st.title("🧠 Emotion Analytics for Early Mental Health Detection")
 
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("Algorithm", "Support Vector Machine (SVM)")
+    col2.metric("Features", "TF-IDF")
+    col3.metric("Evaluation", "ROC–AUC")
+    col4.metric("Platform", "Streamlit")
+
+    st.markdown("""
+    ### 🔍 About the System
+    This application analyzes journal entries using a **hybrid NLP approach**:
+    - **Rule-based lexical sentiment analysis**
+    - **Machine Learning (SVM) fallback**
+    - **Emotion keyword detection**
+
+    It is designed for **early mental health trend detection** using daily journal data.
+    """)
+
+
 # ==========================================================
 # LIVE JOURNAL ANALYSIS (CORRECTED)
 # ==========================================================
@@ -159,7 +176,7 @@ elif menu == "Live Journal Analysis":
         fig = go.Figure(go.Indicator(
             mode="gauge+number",
             value=score,
-            title={"texttext": "Sentiment Score"},
+            title={"text": "Sentiment Score"},
             gauge={"axis": {"range": [0, 1]}}
         ))
         st.plotly_chart(fig, use_container_width=True)
@@ -227,3 +244,4 @@ elif menu == "About":
 
 st.markdown("---")
 st.markdown("<center>🧠 Emotion Analytics Dashboard</center>", unsafe_allow_html=True)
+
