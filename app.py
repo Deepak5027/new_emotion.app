@@ -15,6 +15,11 @@ from datetime import datetime
 from wordcloud import WordCloud
 from sklearn.metrics import confusion_matrix, accuracy_score, precision_score, recall_score, f1_score
 from sklearn.preprocessing import label_binarize
+from sklearn.model_selection import train_test_split
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.svm import SVC
+from sklearn.metrics import classification_report
+
 
 # ----------------------------------------------------------
 # PAGE CONFIG
@@ -212,30 +217,6 @@ elif menu == "Word & Text Analysis":
         plt.axis("off")
         st.pyplot(plt.gcf())
 
-uploaded_file = st.file_uploader("Upload Dataset (CSV)", type=["csv"])
-
-if uploaded_file is not None:
-    data = pd.read_csv(uploaded_file)
-
-    X = data["text"]
-    y = data["label"]
-
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=42
-    )
-
-    vectorizer = TfidfVectorizer()
-    X_train_vec = vectorizer.fit_transform(X_train)
-    X_test_vec = vectorizer.transform(X_test)
-
-    model = SVC(kernel="linear")
-    model.fit(X_train_vec, y_train)
-
-    y_pred = model.predict(X_test_vec)
-
-    # 🔐 Store results in session state
-    st.session_state["y_test"] = y_test
-    st.session_state["y_pred"] = y_pred
 
 MODEL_METRICS = {
     "Accuracy": 0.91,
@@ -250,38 +231,63 @@ CONFUSION_MATRIX = np.array([
     [6, 9, 110]
 ])
 
+#model evaluation
 
+elif menu == "Model Evaluation":
+    st.title("📊 Model Evaluation (Dataset Based)")
 
-if "y_test" in st.session_state and "y_pred" in st.session_state:
+    uploaded_file = st.file_uploader(
+        "Upload labeled dataset (text, label)",
+        type=["csv"]
+    )
 
-    y_test = st.session_state["y_test"]
-    y_pred = st.session_state["y_pred"]
+    if uploaded_file is not None:
+        data = pd.read_csv(uploaded_file)
 
-    st.subheader("📊 Model Performance Metrics")
+        if "text" not in data.columns or "label" not in data.columns:
+            st.error("Dataset must contain 'text' and 'label' columns")
+        else:
+            X = data["text"].apply(clean_text)
+            y = data["label"]
 
-    col1, col2, col3, col4 = st.columns(4)
+            X_train, X_test, y_train, y_test = train_test_split(
+                X, y, test_size=0.2, random_state=42
+            )
 
-    col1.metric("Accuracy", f"{accuracy_score(y_test, y_pred):.2f}")
-    col2.metric("Precision", f"{precision_score(y_test, y_pred, average='weighted'):.2f}")
-    col3.metric("Recall", f"{recall_score(y_test, y_pred, average='weighted'):.2f}")
-    col4.metric("F1 Score", f"{f1_score(y_test, y_pred, average='weighted'):.2f}")
+            X_train_vec = vectorizer.transform(X_train)
+            X_test_vec = vectorizer.transform(X_test)
 
-    st.subheader("📋 Classification Report")
-    st.text(classification_report(y_test, y_pred))
+            y_pred = svm_model.predict(X_test_vec)
+            y_pred = label_encoder.inverse_transform(y_pred)
 
-    st.subheader("🧩 Confusion Matrix")
+            st.subheader("📊 Performance Metrics")
 
-    cm = confusion_matrix(y_test, y_pred)
+            col1, col2, col3, col4 = st.columns(4)
+            col1.metric("Accuracy", f"{accuracy_score(y_test, y_pred):.2f}")
+            col2.metric("Precision", f"{precision_score(y_test, y_pred, average='weighted'):.2f}")
+            col3.metric("Recall", f"{recall_score(y_test, y_pred, average='weighted'):.2f}")
+            col4.metric("F1 Score", f"{f1_score(y_test, y_pred, average='weighted'):.2f}")
 
-    fig, ax = plt.subplots()
-    sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", ax=ax)
-    ax.set_xlabel("Predicted")
-    ax.set_ylabel("Actual")
+            st.subheader("📋 Classification Report")
+            st.text(classification_report(y_test, y_pred))
 
-    st.pyplot(fig)
+            st.subheader("🧩 Confusion Matrix")
 
-else:
-    st.info("⬆️ Upload a dataset to see model evaluation results.")
+            cm = confusion_matrix(y_test, y_pred)
+            fig, ax = plt.subplots()
+            sns.heatmap(
+                cm,
+                annot=True,
+                fmt="d",
+                cmap="Blues",
+                xticklabels=label_encoder.classes_,
+                yticklabels=label_encoder.classes_
+            )
+            ax.set_xlabel("Predicted")
+            ax.set_ylabel("Actual")
+            st.pyplot(fig)
+    else:
+        st.info("Upload a labeled dataset to evaluate the model.")
 
 
 
@@ -317,5 +323,6 @@ elif menu == "About":
 
 st.markdown("---")
 st.markdown("<center>🧠 Emotion Analytics Dashboard</center>", unsafe_allow_html=True)
+
 
 
