@@ -212,6 +212,79 @@ elif menu == "Word & Text Analysis":
         plt.axis("off")
         st.pyplot(plt.gcf())
 
+uploaded_file = st.file_uploader("Upload Dataset (CSV)", type=["csv"])
+
+if uploaded_file is not None:
+    data = pd.read_csv(uploaded_file)
+
+    X = data["text"]
+    y = data["label"]
+
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, random_state=42
+    )
+
+    vectorizer = TfidfVectorizer()
+    X_train_vec = vectorizer.fit_transform(X_train)
+    X_test_vec = vectorizer.transform(X_test)
+
+    model = SVC(kernel="linear")
+    model.fit(X_train_vec, y_train)
+
+    y_pred = model.predict(X_test_vec)
+
+    # 🔐 Store results in session state
+    st.session_state["y_test"] = y_test
+    st.session_state["y_pred"] = y_pred
+
+MODEL_METRICS = {
+    "Accuracy": 0.91,
+    "Precision": 0.90,
+    "Recall": 0.89,
+    "F1-Score": 0.89
+}
+
+CONFUSION_MATRIX = np.array([
+    [120, 10, 5],
+    [8, 130, 12],
+    [6, 9, 110]
+])
+
+
+
+if "y_test" in st.session_state and "y_pred" in st.session_state:
+
+    y_test = st.session_state["y_test"]
+    y_pred = st.session_state["y_pred"]
+
+    st.subheader("📊 Model Performance Metrics")
+
+    col1, col2, col3, col4 = st.columns(4)
+
+    col1.metric("Accuracy", f"{accuracy_score(y_test, y_pred):.2f}")
+    col2.metric("Precision", f"{precision_score(y_test, y_pred, average='weighted'):.2f}")
+    col3.metric("Recall", f"{recall_score(y_test, y_pred, average='weighted'):.2f}")
+    col4.metric("F1 Score", f"{f1_score(y_test, y_pred, average='weighted'):.2f}")
+
+    st.subheader("📋 Classification Report")
+    st.text(classification_report(y_test, y_pred))
+
+    st.subheader("🧩 Confusion Matrix")
+
+    cm = confusion_matrix(y_test, y_pred)
+
+    fig, ax = plt.subplots()
+    sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", ax=ax)
+    ax.set_xlabel("Predicted")
+    ax.set_ylabel("Actual")
+
+    st.pyplot(fig)
+
+else:
+    st.info("⬆️ Upload a dataset to see model evaluation results.")
+
+
+
 # ==========================================================
 # INSIGHTS
 # ==========================================================
@@ -244,4 +317,5 @@ elif menu == "About":
 
 st.markdown("---")
 st.markdown("<center>🧠 Emotion Analytics Dashboard</center>", unsafe_allow_html=True)
+
 
