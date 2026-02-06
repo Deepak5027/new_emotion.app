@@ -92,13 +92,15 @@ neutral_words = [
 def rule_based_sentiment(text):
     pos = sum(1 for w in positive_words if w in text)
     neg = sum(1 for w in negative_words if w in text)
+    neu = sum(1 for w in neutral_words if w in text)
 
-    if pos > neg and pos > 0:
+    if pos > neg and pos > neu:
         return "Positive"
-    elif neg > pos and neg > 0:
+    elif neg > pos and neg > neu:
         return "Negative"
     else:
         return "Neutral"
+
 
 # ----------------------------------------------------------
 # SENTIMENT SCORE
@@ -323,6 +325,7 @@ elif menu == "About":
 
 st.markdown("---")
 st.markdown("<center>🧠 Emotion Analytics Dashboard</center>", unsafe_allow_html=True)
+
 
 
 
