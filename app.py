@@ -238,6 +238,9 @@ elif menu == "Model Evaluation":
 
         X_test_vec = vectorizer.transform(X_test)
 
+        y_test = y_test.astype(str).str.strip().str.capitalize()
+        y_test_encoded = label_encoder.transform(y_test)
+        y_pred_encoded = svm_model.predict(X_test_vec)
         y_pred = svm_model.predict(X_test_vec)
         y_pred = label_encoder.inverse_transform(y_pred)
 
@@ -253,7 +256,7 @@ elif menu == "Model Evaluation":
         st.text(classification_report(y_test, y_pred))
 
         st.subheader("🧩 Confusion Matrix")
-        cm = confusion_matrix(y_test, y_pred)
+        cm = confusion_matrix(y_test_encoded, y_pred_encoded)
 
         fig, ax = plt.subplots()
         sns.heatmap(
@@ -297,5 +300,6 @@ elif menu == "About":
 
 st.markdown("---")
 st.markdown("<center>🧠 Emotion Analytics Dashboard</center>", unsafe_allow_html=True)
+
 
 
