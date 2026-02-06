@@ -208,6 +208,9 @@ elif menu == "Word & Text Analysis":
 # ==========================================================
 # MODEL EVALUATION (FINAL – GUARANTEED METRICS)
 # ==========================================================
+# ==========================================================
+# MODEL EVALUATION (FINAL – GUARANTEED METRICS)
+# ==========================================================
 elif menu == "Model Evaluation":
     st.title("📊 Model Evaluation")
 
@@ -226,21 +229,13 @@ elif menu == "Model Evaluation":
     st.dataframe(df.head())
 
     # Column selection
-    # Column selection (AUTO FIXED)
-text_col = st.selectbox(
-    "Select TEXT column",
-    df.columns,
-    index=list(df.columns).index("text") if "text" in df.columns else 0
-)
+    text_col = st.selectbox("Select TEXT column", df.columns)
+    label_col = st.selectbox("Select LABEL column", df.columns)
 
-label_col = st.selectbox(
-    "Select LABEL column",
-    df.columns,
-    index=list(df.columns).index("sentiment") if "sentiment" in df.columns else 1
-)
-
-
-    # Safety che
+    # Safety check
+    if text_col == label_col:
+        st.error("❌ Text column and Label column must be different")
+        st.stop()
 
     # Clean text
     X = df[text_col].astype(str).apply(clean_text)
@@ -250,7 +245,7 @@ label_col = st.selectbox(
         df[label_col]
         .astype(str)
         .str.strip()
-        .str.lower()
+        .str.capitalize()
     )
 
     # Keep only labels known to model
@@ -344,6 +339,7 @@ elif menu == "About":
 
 st.markdown("---")
 st.markdown("<center>🧠 Emotion Analytics Dashboard</center>", unsafe_allow_html=True)
+
 
 
 
